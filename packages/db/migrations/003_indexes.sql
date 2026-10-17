@@ -48,8 +48,8 @@ CREATE INDEX ix_patients_phone_trgm ON patients USING gin ((regexp_replace(phone
 CREATE INDEX ix_audit_new_data ON audit_log USING gin (new_data jsonb_path_ops);
 
 -- BRIN: великі хронологічні таблиці
-CREATE INDEX ix_audit_changed_at ON audit_log USING brin (changed_at);
-CREATE INDEX ix_payments_paid_at ON payments USING brin (paid_at);
+CREATE INDEX ix_audit_changed_at ON audit_log USING brin (changed_at) WITH (pages_per_range = 32);
+CREATE INDEX ix_payments_paid_at ON payments USING brin (paid_at) WITH (pages_per_range = 8);
 
 -- Covering: index-only scan для історії пацієнта
 CREATE INDEX ix_appointments_patient ON appointments (patient_id) INCLUDE (starts_at, status);
