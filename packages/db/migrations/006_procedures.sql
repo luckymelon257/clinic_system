@@ -141,13 +141,11 @@ BEGIN
     RAISE EXCEPTION 'Лікар не працює у цей день' USING ERRCODE = 'P0020'; -- BR-3
   END IF;
   v_end := p_start + make_interval(mins => v_slot);
-  IF NOT fn_is_doctor_available(p_doctor_id, p_start, v_end) THEN
-    IF EXISTS (SELECT 1 FROM appointments a
-               WHERE a.doctor_id = p_doctor_id AND a.status NOT IN ('cancelled', 'no_show')
-                 AND tstzrange(a.starts_at, a.ends_at) && tstzrange(p_start, v_end)) THEN
-      RAISE EXCEPTION 'Лікар уже має запис на цей час' USING ERRCODE = 'P0409'; -- BR-1
-    END IF;
+  IF NOT fn_is_within_schedule(p_doctor_id, p_start, v_end) THEN
     RAISE EXCEPTION 'Час поза розкладом лікаря або не збігається з сіткою слотів' USING ERRCODE = 'P0020'; -- BR-3
+  END IF;
+  IF NOT fn_is_doctor_available(p_doctor_id, p_start, v_end) THEN
+    RAISE EXCEPTION 'Лікар уже має запис на цей час' USING ERRCODE = 'P0409'; -- BR-1
   END IF;
   INSERT INTO appointments (patient_id, doctor_id, starts_at, ends_at, reason)
   VALUES (p_patient_id, p_doctor_id, p_start, v_end, p_reason)
@@ -180,13 +178,11 @@ BEGIN
     RAISE EXCEPTION 'Лікар не працює у цей день' USING ERRCODE = 'P0020';
   END IF;
   v_end := p_new_start + make_interval(mins => v_slot);
-  IF NOT fn_is_doctor_available(v_appt.doctor_id, p_new_start, v_end, p_id) THEN
-    IF EXISTS (SELECT 1 FROM appointments a
-               WHERE a.doctor_id = v_appt.doctor_id AND a.id <> p_id AND a.status NOT IN ('cancelled', 'no_show')
-                 AND tstzrange(a.starts_at, a.ends_at) && tstzrange(p_new_start, v_end)) THEN
-      RAISE EXCEPTION 'Лікар уже має запис на цей час' USING ERRCODE = 'P0409';
-    END IF;
+  IF NOT fn_is_within_schedule(v_appt.doctor_id, p_new_start, v_end) THEN
     RAISE EXCEPTION 'Час поза розкладом лікаря або не збігається з сіткою слотів' USING ERRCODE = 'P0020';
+  END IF;
+  IF NOT fn_is_doctor_available(v_appt.doctor_id, p_new_start, v_end, p_id) THEN
+    RAISE EXCEPTION 'Лікар уже має запис на цей час' USING ERRCODE = 'P0409';
   END IF;
   UPDATE appointments SET starts_at = p_new_start, ends_at = v_end WHERE id = p_id;
 END $$;

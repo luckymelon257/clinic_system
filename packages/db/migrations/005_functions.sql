@@ -12,22 +12,28 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT p_last || ' ' || p_first || coalesce(' ' || nullif(btrim(p_middle), ''), '')
 $$;
 
--- Лікар доступний: інтервал у межах розкладу на цей день, вирівняний по сітці слотів, і без перетинів
+-- Інтервал у межах розкладу лікаря на цей день і вирівняний по сітці слотів (BR-3)
+CREATE FUNCTION fn_is_within_schedule(p_doctor_id int, p_start timestamptz, p_end timestamptz) RETURNS boolean
+LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM doctor_schedules s
+    JOIN doctors d ON d.id = s.doctor_id AND d.deleted_at IS NULL
+    WHERE s.doctor_id = p_doctor_id
+      AND s.weekday = extract(isodow FROM p_start)
+      AND p_start::date = p_end::date
+      AND p_start::time >= s.start_time
+      AND p_end::time <= s.end_time
+      AND (extract(epoch FROM p_start::time - s.start_time)::int / 60) % s.slot_minutes = 0
+  )
+$$;
+
+-- Лікар доступний: у межах розкладу і без перетинів з іншими (не скасованими) записами
 CREATE FUNCTION fn_is_doctor_available(
   p_doctor_id int, p_start timestamptz, p_end timestamptz, p_exclude_appointment_id int DEFAULT NULL
 ) RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT EXISTS (
-           SELECT 1
-           FROM doctor_schedules s
-           JOIN doctors d ON d.id = s.doctor_id AND d.deleted_at IS NULL
-           WHERE s.doctor_id = p_doctor_id
-             AND s.weekday = extract(isodow FROM p_start)
-             AND p_start::date = p_end::date
-             AND p_start::time >= s.start_time
-             AND p_end::time <= s.end_time
-             AND (extract(epoch FROM p_start::time - s.start_time)::int / 60) % s.slot_minutes = 0
-         )
+  SELECT fn_is_within_schedule(p_doctor_id, p_start, p_end)
      AND NOT EXISTS (
            SELECT 1
            FROM appointments a
