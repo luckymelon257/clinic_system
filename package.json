@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.34.5",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -13,7 +15,8 @@
     "db:up": "docker compose up -d db",
     "db:migrate": "pnpm --filter @clinic/db migrate",
     "db:seed": "pnpm --filter @clinic/db seed",
-    "db:reset": "pnpm --filter @clinic/db reset"
+    "db:reset": "pnpm --filter @clinic/db reset",
+    "e2e": "pnpm --filter @clinic/e2e e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

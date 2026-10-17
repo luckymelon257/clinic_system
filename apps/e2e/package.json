@@ -1,0 +1,14 @@
+{
+  "name": "@clinic/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint tests playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}
