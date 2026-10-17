@@ -136,7 +136,7 @@ export function VisitPage() {
     <form onSubmit={submit} noValidate>
       <Stack>
         <Title order={2}>Прийом: {a.patientName}</Title>
-        <Text c="dimmed">
+        <Text c="dimmed" component="div">
           {fmtDateTime(a.startsAt)} · {a.doctorName} · {a.reason ?? 'без причини'} · <StatusBadge map={APPT_STATUS} value={a.status} />
         </Text>
         {a.status === 'completed' && <Alert color="yellow">Цей прийом уже завершено (медичний запис №{a.medicalRecordId}).</Alert>}

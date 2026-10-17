@@ -653,6 +653,7 @@ export const handlers = (Object.keys(routes) as RouteName[]).map((name) => {
         user,
       };
       const out = (impl[name] as (c: typeof ctx) => unknown)(ctx);
+      route.output.parse(out); // mocks must stay contract-shaped; drift fails loudly in tests and dev
       return HttpResponse.json(out as object, { status: route.status ?? 200 });
     } catch (e) {
       if (!(e instanceof MockError)) throw e;
