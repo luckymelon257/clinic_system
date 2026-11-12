@@ -5,16 +5,24 @@ import {
   AuditOperation,
   BedStatus,
   BloodType,
+  DataSource,
   DiagnosisKind,
+  EngineStatus,
+  ExposureType,
+  InteractionSeverity,
+  InteractionVia,
   InvoiceItemType,
   InvoiceStatus,
   LabOrderStatus,
   LabPriority,
   MedicationForm,
   PaymentMethod,
+  PersonKind,
   Role,
   Sex,
   SoftDeleteTable,
+  StaffRole,
+  VitalSign,
   WardType,
 } from './enums';
 
@@ -382,6 +390,176 @@ export const Ok = z.object({ ok: z.literal(true) });
 export const Created = z.object({ id: Id });
 
 export const Paged = <T extends z.ZodTypeAny>(item: T) => z.object({ items: z.array(item), total: z.number().int() });
+
+// ---------- Lab 2: graph read-model (F-35, F-36, F-37, BR-11) ----------
+// Every graph answer says which engine produced it and how stale the read-model was (asOf / lagMs).
+const Freshness = {
+  engine: DataSource,
+  asOf: Timestamp, // PG time up to which the outbox was applied when the query ran
+  lagMs: z.number().int().nonnegative(), // age of the oldest unapplied outbox event (0 = in sync)
+};
+
+export const PersonRef = z.object({ kind: PersonKind, id: Id, name: z.string(), role: StaffRole.nullable() });
+
+export const TraceContact = z.object({
+  kind: PersonKind,
+  id: Id,
+  name: z.string(),
+  role: StaffRole.nullable(), // null for patients
+  hops: z.number().int().min(1), // minimal number of person→place→person steps (D-25)
+  // One witness edge that reached this person at `hops` (draws the BFS tree in the UI)
+  parentKind: PersonKind,
+  parentId: Id,
+  exposure: ExposureType,
+  placeId: Id,
+  placeName: z.string().nullable(),
+  overlapMinutes: z.number().nonnegative(), // overlap of that witness contact, clipped to the window
+});
+
+export const TraceResult = z.object({
+  index: PersonRef,
+  from: Timestamp,
+  to: Timestamp,
+  depth: z.number().int(),
+  contacts: z.array(TraceContact),
+  tookMs: z.number().nonnegative(),
+  ...Freshness,
+});
+
+export const PathStep = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('person'), kind: PersonKind, id: Id, name: z.string() }),
+  z.object({ type: z.literal('place'), kind: ExposureType, id: Id, name: z.string().nullable(), from: Timestamp, to: Timestamp }),
+]);
+
+export const ExposurePathResult = z.object({
+  found: z.boolean(),
+  hops: z.number().int().nullable(), // null = not connected within maxDepth
+  steps: z.array(PathStep), // person, place, person, … (empty when not found)
+  ...Freshness,
+});
+
+export const DrugInteraction = z.object({
+  medicationAId: Id, // medicationAId < medicationBId
+  medicationAName: z.string(),
+  medicationBId: Id,
+  medicationBName: z.string(),
+  severity: InteractionSeverity,
+  via: InteractionVia,
+  classAId: Id.nullable(), // class of medication A (via = 'class')
+  classAName: z.string().nullable(),
+  classBId: Id.nullable(),
+  classBName: z.string().nullable(),
+});
+
+export const InteractionCheckResult = z.object({
+  interactions: z.array(DrugInteraction),
+  maxSeverity: InteractionSeverity.nullable(),
+  requiresAcknowledgement: z.boolean(), // any `major` → BR-13
+  currentMedicationIds: z.array(Id), // what the patient takes at `at` (empty without patientId)
+  ...Freshness, // engine = 'postgres' when Neo4j is down (fallback, D-28)
+});
+
+// ---------- Lab 2: Redis-backed operational state (F-40…F-45) ----------
+export const TriageEntry = z.object({
+  id: Id,
+  patientId: Id.nullable(),
+  patientName: z.string(),
+  esi: z.number().int().min(1).max(5),
+  complaint: z.string(),
+  arrivedAt: Timestamp,
+  position: z.number().int().min(0), // 1-based place in the queue; 0 once called
+});
+
+export const TriageQueue = z.object({ items: z.array(TriageEntry), total: z.number().int(), source: DataSource });
+export const TriageCallResult = z.object({ entry: TriageEntry.nullable(), remaining: z.number().int() });
+
+export const BedCount = z.object({
+  wardId: Id,
+  wardNumber: z.string(),
+  wardType: WardType,
+  departmentId: Id,
+  departmentName: z.string(),
+  total: z.number().int(),
+  free: z.number().int(),
+  occupied: z.number().int(),
+});
+
+export const BedCounts = z.object({
+  items: z.array(BedCount),
+  source: DataSource, // 'redis' (HINCRBY counters) or 'postgres' (v_beds) when Redis is down
+  reconciledAt: Timestamp.nullable(), // last reconciliation of counters with v_beds
+});
+
+export const EngineHealth = z.object({ status: EngineStatus, latencyMs: z.number().nullable(), error: z.string().nullable() });
+
+export const Health = z.object({
+  status: EngineStatus, // up = all up; degraded = PG up, Neo4j or Redis down; down = PG down
+  postgres: EngineHealth,
+  neo4j: EngineHealth,
+  redis: EngineHealth,
+  graphSync: z.object({ pending: z.number().int().nullable(), lagMs: z.number().int().nullable(), lastProcessedAt: Timestamp.nullable() }),
+  checkedAt: Timestamp,
+});
+
+export const Vitals = z.object({
+  hr: z.number(), // heart rate, 1/min
+  spo2: z.number(), // %
+  sbp: z.number(), // systolic BP, mmHg
+  dbp: z.number(), // diastolic BP, mmHg
+  rr: z.number(), // respiratory rate, 1/min
+  temp: z.number(), // °C
+  at: Timestamp,
+});
+
+export const IcuBed = z.object({
+  bedId: Id,
+  bedNumber: z.string(),
+  wardId: Id,
+  wardNumber: z.string(),
+  patientId: Id.nullable(),
+  patientName: z.string().nullable(),
+  vitals: Vitals.nullable(), // latest reading (icu:latest:{bedId}), null when the monitor is silent
+  alerting: z.boolean(),
+});
+
+export const VitalViolation = z.object({ sign: VitalSign, value: z.number(), rule: z.string() }); // rule e.g. '< 88'
+
+export const IcuAlert = z.object({
+  id: z.string(), // Redis Stream entry id of the reading that triggered it
+  bedId: Id,
+  patientId: Id.nullable(),
+  patientName: z.string().nullable(),
+  violations: z.array(VitalViolation).min(1),
+  vitals: Vitals,
+  at: Timestamp,
+});
+
+// GET /icu/stream is text/event-stream; each `data:` line is one of these JSON objects
+export const IcuStreamEvent = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('vitals'), bedId: Id, vitals: Vitals }),
+  z.object({ type: z.literal('alert'), alert: IcuAlert }),
+  z.object({ type: z.literal('ping'), at: Timestamp }),
+]);
+
+export type PersonRef = z.infer<typeof PersonRef>;
+export type TraceContact = z.infer<typeof TraceContact>;
+export type TraceResult = z.infer<typeof TraceResult>;
+export type PathStep = z.infer<typeof PathStep>;
+export type ExposurePathResult = z.infer<typeof ExposurePathResult>;
+export type DrugInteraction = z.infer<typeof DrugInteraction>;
+export type InteractionCheckResult = z.infer<typeof InteractionCheckResult>;
+export type TriageEntry = z.infer<typeof TriageEntry>;
+export type TriageQueue = z.infer<typeof TriageQueue>;
+export type TriageCallResult = z.infer<typeof TriageCallResult>;
+export type BedCount = z.infer<typeof BedCount>;
+export type BedCounts = z.infer<typeof BedCounts>;
+export type EngineHealth = z.infer<typeof EngineHealth>;
+export type Health = z.infer<typeof Health>;
+export type Vitals = z.infer<typeof Vitals>;
+export type IcuBed = z.infer<typeof IcuBed>;
+export type VitalViolation = z.infer<typeof VitalViolation>;
+export type IcuAlert = z.infer<typeof IcuAlert>;
+export type IcuStreamEvent = z.infer<typeof IcuStreamEvent>;
 
 export type CurrentUser = z.infer<typeof CurrentUser>;
 export type LoginResponse = z.infer<typeof LoginResponse>;

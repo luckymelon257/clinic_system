@@ -30,6 +30,17 @@ export const SoftDeleteTable = z.enum([
   'insurance_companies',
 ]);
 
+// ---------- Lab 2 (NoSQL) ----------
+export const StaffRole = z.enum(['doctor', 'nurse']); // staff_role
+export const InteractionSeverity = z.enum(['minor', 'moderate', 'major']); // interaction_severity
+// Not PG enums: discriminators of v_presence / graph labels and engine metadata.
+export const PersonKind = z.enum(['patient', 'staff']); // v_presence.person_kind, (:Person:Patient|:Person:Staff)
+export const ExposureType = z.enum(['room', 'ward', 'office']); // v_presence.place_kind, (:Place:Room|:Ward|:Office)
+export const InteractionVia = z.enum(['direct', 'class']); // medication–medication or class–class
+export const EngineStatus = z.enum(['up', 'degraded', 'down']);
+export const DataSource = z.enum(['postgres', 'neo4j', 'redis']); // which engine produced the answer
+export const VitalSign = z.enum(['hr', 'spo2', 'sbp', 'dbp', 'rr', 'temp']); // ICU monitor (BR-17)
+
 export type Role = z.infer<typeof Role>;
 export type Sex = z.infer<typeof Sex>;
 export type BloodType = z.infer<typeof BloodType>;
@@ -46,3 +57,11 @@ export type InvoiceItemType = z.infer<typeof InvoiceItemType>;
 export type PaymentMethod = z.infer<typeof PaymentMethod>;
 export type AuditOperation = z.infer<typeof AuditOperation>;
 export type SoftDeleteTable = z.infer<typeof SoftDeleteTable>;
+export type StaffRole = z.infer<typeof StaffRole>;
+export type InteractionSeverity = z.infer<typeof InteractionSeverity>;
+export type PersonKind = z.infer<typeof PersonKind>;
+export type ExposureType = z.infer<typeof ExposureType>;
+export type InteractionVia = z.infer<typeof InteractionVia>;
+export type EngineStatus = z.infer<typeof EngineStatus>;
+export type DataSource = z.infer<typeof DataSource>;
+export type VitalSign = z.infer<typeof VitalSign>;

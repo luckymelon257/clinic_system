@@ -7,6 +7,7 @@ import {
   InvoiceStatus,
   LabPriority,
   PaymentMethod,
+  PersonKind,
   Role,
   Sex,
   SoftDeleteTable,
@@ -151,6 +152,8 @@ export const VisitCompleteInput = z
     diagnoses: z.array(DiagnosisInput).min(1, 'Хоча б один діагноз'),
     prescription: PrescriptionInput.nullish().transform((v) => v ?? null),
     labOrder: LabOrderInlineInput.nullish().transform((v) => v ?? null),
+    // BR-13 (Lab 2): a `major` interaction does not block, but the doctor must confirm it explicitly
+    interactionsAcknowledged: z.boolean().optional(),
   })
   .refine((v) => v.diagnoses.filter((d) => d.kind === 'primary').length === 1, {
     path: ['diagnoses'],
@@ -240,6 +243,68 @@ export const AuditQuery = z.object({
   offset,
 });
 export const DeletedQuery = z.object({ tableName: SoftDeleteTable.optional() });
+
+// ---------- Lab 2: graph (F-35, F-36, F-37), BR-12 ----------
+export const TRACE_MAX_WINDOW_DAYS = 90;
+const DAY_MS = 86_400_000;
+type Window = { from: string; to: string };
+const windowOrdered = (v: Window) => Date.parse(v.from) < Date.parse(v.to);
+const windowShort = (v: Window) => Date.parse(v.to) - Date.parse(v.from) <= TRACE_MAX_WINDOW_DAYS * DAY_MS;
+const ORDERED = { path: ['to'], message: 'Кінець вікна має бути пізніше за початок' };
+const SHORT = { path: ['to'], message: `Вікно не довше ${TRACE_MAX_WINDOW_DAYS} днів` };
+
+// GET /graph/trace — window [from, to) half-open, depth 1..5
+export const TraceContactsQuery = z
+  .object({
+    personKind: PersonKind.default('patient'),
+    personId: z.coerce.number().int().positive(),
+    from: DateTime,
+    to: DateTime,
+    depth: z.coerce.number().int().min(1).max(5).default(2),
+  })
+  .refine(windowOrdered, ORDERED)
+  .refine(windowShort, SHORT);
+
+// GET /graph/path — shortest exposure chain between two persons (null when not connected within maxDepth)
+export const ExposurePathQuery = z
+  .object({
+    aKind: PersonKind.default('patient'),
+    aId: z.coerce.number().int().positive(),
+    bKind: PersonKind.default('patient'),
+    bId: z.coerce.number().int().positive(),
+    from: DateTime,
+    to: DateTime,
+    maxDepth: z.coerce.number().int().min(1).max(8).default(6),
+  })
+  .refine(windowOrdered, ORDERED)
+  .refine(windowShort, SHORT)
+  .refine((v) => v.aKind !== v.bKind || v.aId !== v.bId, { path: ['bId'], message: 'Оберіть дві різні особи' });
+
+// POST /interactions/check — new medications vs each other and (optionally) what the patient takes at `at`
+export const InteractionCheckInput = z.object({
+  medicationIds: z.array(z.number().int().positive()).min(1, 'Хоча б один препарат').max(20),
+  patientId: z.number().int().positive().nullish().transform((v) => v ?? null),
+  at: DateTime.nullish().transform((v) => v ?? null), // null = now
+});
+
+// ---------- Lab 2: Redis-backed (F-40, F-44) ----------
+export const TriageAddInput = z.object({
+  patientId: z.number().int().positive().nullish().transform((v) => v ?? null), // unknown arrivals allowed
+  patientName: text(200),
+  esi: z.number().int().min(1, 'ESI 1–5').max(5, 'ESI 1–5'), // 1 = resuscitation … 5 = non-urgent
+  complaint: text(500),
+});
+
+export const IcuAlertsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  bedId: z.coerce.number().int().positive().optional(),
+});
+
+export type TraceContactsQuery = z.infer<typeof TraceContactsQuery>;
+export type ExposurePathQuery = z.infer<typeof ExposurePathQuery>;
+export type InteractionCheckInput = z.infer<typeof InteractionCheckInput>;
+export type TriageAddInput = z.infer<typeof TriageAddInput>;
+export type IcuAlertsQuery = z.infer<typeof IcuAlertsQuery>;
 
 export type LoginInput = z.infer<typeof LoginInput>;
 export type UserCreateInput = z.infer<typeof UserCreateInput>;
