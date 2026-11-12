@@ -618,6 +618,19 @@ const impl: Impl = {
     audit(user, params.table, params.id, 'RESTORE', { deleted_at: 'set' }, { deleted_at: null });
     return ok;
   },
+  // ---------- Lab 2: W0 placeholders (contract routes exist; mocks land in W2) ----------
+  logout: () => ok,
+  health: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
+  traceContacts: () => fail('GRAPH_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
+  exposurePath: () => fail('GRAPH_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
+  checkInteractions: () => fail('GRAPH_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
+  triageList: () => fail('QUEUE_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
+  triageAdd: () => fail('QUEUE_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
+  triageCallNext: () => fail('QUEUE_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
+  bedCounts: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
+  icuBeds: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
+  icuAlerts: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
+  icuStream: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
 };
 
 function parse(schema: z.ZodType | undefined, value: unknown) {

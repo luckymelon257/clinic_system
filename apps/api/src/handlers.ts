@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { signToken } from './auth';
 import { reads, UnitOfWork } from './db/UnitOfWork';
 import { HttpError, notFound } from './errors';
+import { lab2Pending } from './lab2-pending';
 import { InpatientService } from './services/InpatientService';
 import { RegistrationService } from './services/RegistrationService';
 import { VisitService } from './services/VisitService';
@@ -163,4 +164,5 @@ export const handlers: Handlers = {
     await UnitOfWork.run(user.id, (uow) => uow.audit.restore(params.table, params.id));
     return ok;
   },
+  ...lab2Pending, // W0 placeholders, replaced in W2
 };
