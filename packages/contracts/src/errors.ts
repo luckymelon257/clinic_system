@@ -11,6 +11,8 @@ import { z } from 'zod';
  *   409 CONFLICT          23505 unique, 23P01 exclusion (overlapping slot / bed), P0409
  *   422 BUSINESS_RULE     any other P0xxx, 23503 FK, 23514 CHECK, 23502 NOT NULL
  *   500 INTERNAL          everything else (message is generic, never leaks SQL)
+ *   503 GRAPH_UNAVAILABLE Neo4j unreachable: tracing / exposure path (D-28); interactions fall back to PostgreSQL
+ *   503 QUEUE_UNAVAILABLE Redis unreachable: triage queue lives only in Redis (D-28)
  */
 export const ErrorCode = z.enum([
   'VALIDATION_ERROR',
@@ -20,6 +22,8 @@ export const ErrorCode = z.enum([
   'CONFLICT',
   'BUSINESS_RULE',
   'INTERNAL',
+  'GRAPH_UNAVAILABLE',
+  'QUEUE_UNAVAILABLE',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -45,6 +49,8 @@ export const statusForCode: Record<ErrorCode, number> = {
   CONFLICT: 409,
   BUSINESS_RULE: 422,
   INTERNAL: 500,
+  GRAPH_UNAVAILABLE: 503,
+  QUEUE_UNAVAILABLE: 503,
 };
 
 /**
