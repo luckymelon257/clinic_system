@@ -13,7 +13,7 @@ correct option and append a line to `docs/05-decisions.md`.
 | `apps/web` | `@clinic/web` | Agent 3 (Frontend) |
 | `apps/e2e` | `@clinic/e2e` | orchestrator |
 
-Lab 2 (NoSQL) adds packages below. Spec `docs/06-nosql-requirements.md`; plan, owners per file and waves: `.agent/plans/lab2.md` §3.
+Lab 2 (NoSQL) adds packages below. Spec: `docs/06-nosql-requirements.md`.
 | Package | Name | Owner |
 |---|---|---|
 | `packages/graph` | `@clinic/graph` | `gen/`, `validate.ts`: W1 graph-sql · `neo4j/`, `sync/`, `package.json`: W1 graph-neo4j |
