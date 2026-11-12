@@ -1,5 +1,5 @@
 /**
- * AGENTS.md rule 2: apps/api/src reads only v_* / mv_* / fn_* and writes only via CALL sp_*.
+ * CONTRIBUTING.md rule 2: apps/api/src reads only v_* / mv_* / fn_* and writes only via CALL sp_*.
  * Scans every string / template literal in src/**\/*.ts (comments are skipped) and fails on direct table access.
  */
 import { readdirSync, readFileSync } from 'node:fs';
