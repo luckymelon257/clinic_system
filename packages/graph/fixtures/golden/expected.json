@@ -1,0 +1,141 @@
+{
+  "$comment": "Hand-computed in README.md before any engine code (W0). Persons are {kind, id}; trace results are compared as sets of (kind, id, hops); paths by length only (null = not connected); interactions as sets of rows.",
+  "window": { "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z" },
+  "counts": {
+    "node": { "Patient": 12, "Staff": 5, "Room": 4, "Ward": 3, "Office": 2, "Medication": 7, "DrugClass": 4 },
+    "rel": { "PRESENT": 32, "IN": 4, "IN_CLASS": 7, "INTERACTS": 5, "TAKES": 2 }
+  },
+  "trace": [
+    {
+      "name": "T1 P1, full window, depth 5 (all reachable, D-25 non-temporal hop S1->P11)",
+      "index": { "kind": "patient", "id": 1 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 5,
+      "expected": [
+        { "kind": "patient", "id": 2, "hops": 1 }, { "kind": "patient", "id": 3, "hops": 1 }, { "kind": "staff", "id": 3, "hops": 1 },
+        { "kind": "patient", "id": 4, "hops": 2 }, { "kind": "staff", "id": 4, "hops": 2 }, { "kind": "staff", "id": 1, "hops": 2 },
+        { "kind": "patient", "id": 7, "hops": 3 }, { "kind": "patient", "id": 11, "hops": 3 }, { "kind": "patient", "id": 12, "hops": 3 },
+        { "kind": "staff", "id": 2, "hops": 4 },
+        { "kind": "patient", "id": 8, "hops": 5 }
+      ]
+    },
+    {
+      "name": "T2 P1, full window, depth 2 (depth bound, min hops through triangle P1-P2-P3)",
+      "index": { "kind": "patient", "id": 1 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 2,
+      "expected": [
+        { "kind": "patient", "id": 2, "hops": 1 }, { "kind": "patient", "id": 3, "hops": 1 }, { "kind": "staff", "id": 3, "hops": 1 },
+        { "kind": "patient", "id": 4, "hops": 2 }, { "kind": "staff", "id": 4, "hops": 2 }, { "kind": "staff", "id": 1, "hops": 2 }
+      ]
+    },
+    {
+      "name": "T3 P1, window [03-01, 03-06), depth 5 (window clips P4, S4, S1 ward shift)",
+      "index": { "kind": "patient", "id": 1 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-06T00:00:00Z", "depth": 5,
+      "expected": [
+        { "kind": "patient", "id": 2, "hops": 1 }, { "kind": "patient", "id": 3, "hops": 1 }, { "kind": "staff", "id": 3, "hops": 1 }
+      ]
+    },
+    {
+      "name": "T4 P1, window [03-06, 03-15), depth 3 (index stay ends exactly at window start -> nothing)",
+      "index": { "kind": "patient", "id": 1 }, "from": "2026-03-06T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 3,
+      "expected": []
+    },
+    {
+      "name": "T5 staff S4 (float nurse), full window, depth 2 (staff index, bridges W1 and W3)",
+      "index": { "kind": "staff", "id": 4 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 2,
+      "expected": [
+        { "kind": "patient", "id": 2, "hops": 1 }, { "kind": "patient", "id": 3, "hops": 1 }, { "kind": "patient", "id": 4, "hops": 1 },
+        { "kind": "patient", "id": 7, "hops": 1 },
+        { "kind": "patient", "id": 1, "hops": 2 }, { "kind": "staff", "id": 3, "hops": 2 }, { "kind": "staff", "id": 1, "hops": 2 },
+        { "kind": "staff", "id": 2, "hops": 2 }
+      ]
+    },
+    {
+      "name": "T6 P5, full window, depth 5 (separate component; cancelled appointment ignored)",
+      "index": { "kind": "patient", "id": 5 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 5,
+      "expected": [ { "kind": "patient", "id": 10, "hops": 1 }, { "kind": "staff", "id": 5, "hops": 1 } ]
+    },
+    {
+      "name": "T7 P11, full window, depth 1 (office contact; back-to-back P12 is not a contact)",
+      "index": { "kind": "patient", "id": 11 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 1,
+      "expected": [ { "kind": "staff", "id": 1, "hops": 1 } ]
+    },
+    {
+      "name": "T8 P7, window [03-10, 03-13T09:00), depth 2 (appointment starting exactly at window end excluded)",
+      "index": { "kind": "patient", "id": 7 }, "from": "2026-03-10T00:00:00Z", "to": "2026-03-13T09:00:00Z", "depth": 2,
+      "expected": [ { "kind": "staff", "id": 4, "hops": 1 } ]
+    },
+    {
+      "name": "T9 P3 (open stay t = 9e15), window [03-12, 03-15), depth 2",
+      "index": { "kind": "patient", "id": 3 }, "from": "2026-03-12T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 2,
+      "expected": [ { "kind": "staff", "id": 1, "hops": 1 } ]
+    },
+    {
+      "name": "T10 P6, full window, depth 5 (index presence ends exactly at window start)",
+      "index": { "kind": "patient", "id": 6 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "depth": 5,
+      "expected": []
+    }
+  ],
+  "path": [
+    { "name": "Q1 P1->P4", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 4 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": 2 },
+    { "name": "Q2 P1->P11 (via S1, non-temporal)", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 11 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": 3 },
+    { "name": "Q3 P1->P8 (longest)", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 8 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": 5 },
+    { "name": "Q4 P1->P8 maxDepth 4 (bound)", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 8 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 4, "length": null },
+    { "name": "Q5 P11->P12 (back-to-back appointments, via doctor)", "a": { "kind": "patient", "id": 11 }, "b": { "kind": "patient", "id": 12 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": 2 },
+    { "name": "Q6 P1->P5 (other component)", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 5 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": null },
+    { "name": "Q7 P1->P8 narrow window", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 8 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-06T00:00:00Z", "maxDepth": 6, "length": null },
+    { "name": "Q8 P1->P6 (target outside window)", "a": { "kind": "patient", "id": 1 }, "b": { "kind": "patient", "id": 6 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": null },
+    { "name": "Q9 S3->S2 (staff to staff)", "a": { "kind": "staff", "id": 3 }, "b": { "kind": "staff", "id": 2 }, "from": "2026-03-01T00:00:00Z", "to": "2026-03-15T00:00:00Z", "maxDepth": 6, "length": 4 }
+  ],
+  "interactions": [
+    {
+      "name": "I1 Warfarin + Aspirin: direct and via two class pairs",
+      "medicationIds": [1, 2], "patientId": null, "at": null,
+      "expected": [
+        { "a": 1, "b": 2, "severity": "major", "via": "direct", "classA": null, "classB": null },
+        { "a": 1, "b": 2, "severity": "major", "via": "class", "classA": 1, "classB": 2 },
+        { "a": 1, "b": 2, "severity": "major", "via": "class", "classA": 1, "classB": 3 }
+      ]
+    },
+    {
+      "name": "I2 Ibuprofen + Naproxen: same-class duplication",
+      "medicationIds": [3, 4], "patientId": null, "at": null,
+      "expected": [ { "a": 3, "b": 4, "severity": "moderate", "via": "class", "classA": 2, "classB": 2 } ]
+    },
+    {
+      "name": "I3 Aspirin + Ibuprofen: multi-class med, only NSAID-NSAID matches",
+      "medicationIds": [2, 3], "patientId": null, "at": null,
+      "expected": [ { "a": 2, "b": 3, "severity": "moderate", "via": "class", "classA": 2, "classB": 2 } ]
+    },
+    {
+      "name": "I4 Paracetamol + Omeprazole: nothing",
+      "medicationIds": [7, 5], "patientId": null, "at": null,
+      "expected": []
+    },
+    {
+      "name": "I5 four meds, 6 pairs",
+      "medicationIds": [1, 3, 5, 6], "patientId": null, "at": null,
+      "expected": [
+        { "a": 1, "b": 3, "severity": "major", "via": "class", "classA": 1, "classB": 2 },
+        { "a": 1, "b": 6, "severity": "major", "via": "class", "classA": 1, "classB": 3 },
+        { "a": 5, "b": 6, "severity": "moderate", "via": "direct", "classA": null, "classB": null }
+      ]
+    },
+    {
+      "name": "I6 patient P2 at 03-05 (takes Warfarin, Paracetamol) + new Ibuprofen, Naproxen",
+      "medicationIds": [3, 4], "patientId": 2, "at": "2026-03-05T00:00:00Z",
+      "expected": [
+        { "a": 1, "b": 3, "severity": "major", "via": "class", "classA": 1, "classB": 2 },
+        { "a": 1, "b": 4, "severity": "major", "via": "class", "classA": 1, "classB": 2 },
+        { "a": 3, "b": 4, "severity": "moderate", "via": "class", "classA": 2, "classB": 2 }
+      ]
+    },
+    {
+      "name": "I7 patient P2 at 04-10 (Warfarin course ended 04-03) + new Ibuprofen, Naproxen",
+      "medicationIds": [3, 4], "patientId": 2, "at": "2026-04-10T00:00:00Z",
+      "expected": [ { "a": 3, "b": 4, "severity": "moderate", "via": "class", "classA": 2, "classB": 2 } ]
+    },
+    {
+      "name": "I8 single med: no pairs",
+      "medicationIds": [1], "patientId": null, "at": null,
+      "expected": []
+    }
+  ]
+}
