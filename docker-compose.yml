@@ -1,3 +1,7 @@
+# Lab 1: db. Lab 2 (NoSQL): neo4j, redis, neo4j-test (profile `test`).
+# Equal, fixed resource limits for the engines that are benchmarked against each other (docs/07 §3):
+#   db 2 CPU / 3 GiB, neo4j 2 CPU / 3 GiB (heap 1G + page cache 1500M), redis 1 CPU / 512 MiB.
+# Host ports avoid 5432/5433/3000/7474/7687/6379 (taken by unrelated projects on the dev machine).
 services:
   db:
     image: postgres:16
@@ -8,6 +12,24 @@ services:
       POSTGRES_DB: clinic
       TZ: Europe/Kyiv
       PGTZ: Europe/Kyiv
+    # Settings fixed for the benchmark and recorded in every result file (SHOW ALL subset)
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - work_mem=32MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - jit=off
+      - -c
+      - max_connections=200
+    cpus: 2
+    mem_limit: 3g
+    shm_size: 1g # parallel query / hash joins use POSIX shared memory; docker default 64 MiB is too small
     ports:
       - "5434:5432"
     volumes:
@@ -17,5 +39,82 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: clinic-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/clinicneo4j
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 1500M
+      NEO4J_db_transaction_timeout: 60s
+    cpus: 2
+    mem_limit: 3g
+    ports:
+      - "7475:7474" # HTTP (browser)
+      - "7688:7687" # Bolt
+    volumes:
+      - clinic_neo4j:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p clinicneo4j 'RETURN 1' >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  # Disposable instance for integration tests (Neo4j Community = one database per instance, D-26)
+  neo4j-test:
+    image: neo4j:5.26-community
+    container_name: clinic-neo4j-test
+    profiles: ["test"]
+    environment:
+      NEO4J_AUTH: neo4j/clinicneo4j
+      NEO4J_server_memory_heap_initial__size: 512M
+      NEO4J_server_memory_heap_max__size: 512M
+      NEO4J_server_memory_pagecache_size: 256M
+    cpus: 1
+    mem_limit: 1500m
+    ports:
+      - "7476:7474"
+      - "7689:7687"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p clinicneo4j 'RETURN 1' >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  redis:
+    image: redis:7.4
+    container_name: clinic-redis
+    # AOF everysec: the triage queue lives only in Redis (BR-14) — at most ~1 s of arrivals can be lost on a crash.
+    # noeviction: a full Redis must fail loudly, never silently drop queue entries or revocations.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 400mb
+      - --maxmemory-policy
+      - noeviction
+    cpus: 1
+    mem_limit: 512m
+    ports:
+      - "6380:6379"
+    volumes:
+      - clinic_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
 volumes:
   clinic_pg:
+  clinic_neo4j:
+  clinic_redis:
