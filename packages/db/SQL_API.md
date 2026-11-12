@@ -170,3 +170,41 @@ All write procedures run inside the caller's transaction (never COMMIT themselve
 
 `databaseUrl()`, `withDatabase(url, name)`, `ensureDatabase(url)`, `migrate(url)`, `seed(url, { volume })`,
 `resetDatabase(url, { volume })` — e.g. API tests: `await resetDatabase('postgres://clinic:clinic@localhost:5434/clinic_api_test', { volume: false })`.
+
+## Лаб 2 — міграція 009 (`009_lab2_tables.sql`)
+
+Модель графа у термінах SQL (docs/06 §4, golden fixture: `packages/graph/fixtures/golden/`).
+
+| Об'єкт | Тип | Призначення |
+|---|---|---|
+| `rooms`, `beds.room_id` | таблиця, колонка | кімната ліжка; складений FK `(room_id, ward_id)` гарантує ту саму палату; `trg_beds_default_room` дає ліжку без кімнати першу кімнату палати |
+| `staff`, `staff_shifts` | таблиці | персонал (`staff_role`: doctor / nurse, `doctor_id` для лікаря), зміни з `EXCLUDE` (BR-15) |
+| `drug_classes`, `medication_classes`, `medication_interactions`, `drug_class_interactions` | таблиці | класи, належність, взаємодії (`interaction_severity`); пари впорядковані `a < b` (класи `a <= b`) |
+| `graph_outbox` | таблиця | outbox PG → Neo4j; заповнюють тригери `trg_<table>_graph_outbox` у тій самій транзакції |
+| `fn_epoch_ms(timestamptz)` | функція | час графа: epoch ms, `infinity` → `9e15` |
+| `v_presence` | view | `(person_kind, person_id, place_kind, place_id, f, t, period, src, src_id)` — ребра `PRESENT`; фільтруйте `period && tstzrange($from, $to)` (GiST-індекси на кожному джерелі) |
+| `v_takes` | view | `(rx_item_id, patient_id, medication_id, f, t)` — ребра `TAKES` |
+| `v_graph_persons`, `v_graph_places` | view | вузли `:Person` / `:Place` з іменами |
+| `v_medication_interactions`, `v_drug_class_interactions`, `v_drug_classes`, `v_medication_classes` | view | довідники взаємодій з назвами |
+| `v_graph_counts` | view | очікувані кількості вузлів / ребер після повного ETL |
+| `v_graph_sync_status` | view | `pending`, `oldest_pending_at`, `last_processed_at`, `lag_ms` (BR-11, F-45) |
+| `v_staff`, `v_staff_shifts`, `v_rooms` | view | читання для API (F-38) |
+| `fn_graph_outbox_claim(worker, limit = 500, lease = 30 s)` | функція | забрати пачку подій (`FOR UPDATE SKIP LOCKED`), у порядку `id` |
+| `sp_graph_outbox_ack(ids bigint[], error text = NULL)` | процедура | успіх → `processed_at`; помилка → назад у чергу з `last_error` |
+| `sp_graph_outbox_purge(older interval = 1 day)` | процедура | прибрати оброблені події |
+| `sp_staff_shift_add(staff_id, ward_id, starts_at, ends_at, INOUT id)` | процедура | додати зміну; перетин → `23P01` (409) |
+
+Payload подій `graph_outbox` (`entity` → `payload`):
+
+| entity | entity_key | payload |
+|---|---|---|
+| `patient` / `staff` | id | `{id, name}` / `{id, name, role}` |
+| `ward` / `room` / `office` | id | `{id, name, departmentId, type}` / `{id, name, wardId}` / `{id, departmentId}` |
+| `presence` | `admission:17`, `shift:5`, `appointment:9` | `{src, srcId, edges: [{personKind, personId, placeKind, placeId, f, t}]}` — **усі** ребра джерела; порожній масив = видалити |
+| `takes` | rx item id | `{rxItemId, patientId, medicationId, f, t}` |
+| `medication` / `drug_class` | id | `{id, name}` / `{id, code, name}` |
+| `medication_class` | medication id | `{medicationId, classIds: [...]}` — повний набір класів препарату |
+| `medication_interaction` / `class_interaction` | `a:b` | `{a, b, severity}`; `op = 'delete'` — пару видалено |
+
+Масове завантаження без подій: `SET session_replication_role = replica` (тригери вимкнено) → повний ETL.
+Повний ETL у знімку `REPEATABLE READ` має підтвердити (`sp_graph_outbox_ack`) усі події з `id <=` максимального id, видимого в знімку.
