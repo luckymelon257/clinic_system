@@ -3,8 +3,14 @@ import request from 'supertest';
 import { afterAll, expect } from 'vitest';
 import { createApp } from '../src/app';
 import { pool } from '../src/db/pool';
+import { resetNoSql } from '../src/nosql';
 
-afterAll(() => pool.end());
+export { app };
+
+afterAll(async () => {
+  await resetNoSql();
+  await pool.end();
+});
 
 const app = createApp();
 

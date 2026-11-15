@@ -7,5 +7,5 @@ export default defineConfig({
   target: 'node20',
   outDir: 'dist',
   clean: true,
-  noExternal: ['@clinic/contracts'], // ships TS source, must be bundled
+  noExternal: ['@clinic/contracts', '@clinic/graph', '@clinic/redis'], // ship TS source, must be bundled
 });
