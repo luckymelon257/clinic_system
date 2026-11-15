@@ -1,5 +1,6 @@
 import type { Driver } from 'neo4j-driver';
 import pg from 'pg';
+import { int } from '../neo4j/driver';
 import { ensureSchema, wipeGraph } from '../neo4j/schema';
 
 // Full ETL PostgreSQL → Neo4j (bootstrap, D-23). One REPEATABLE READ snapshot is read through server-side cursors
@@ -107,9 +108,11 @@ const STEPS: Step[] = [
   },
 ];
 
-// bigint columns (epoch ms, ids) arrive as strings from pg — convert to numbers before sending to Neo4j
+// Every numeric column is an id or epoch ms: send it as a Neo4j INTEGER (JS numbers would become FLOATs).
+// bigint columns (fn_epoch_ms) arrive from pg as strings.
+const INT_COLS = new Set(['id', 'f', 't', 'srcId', 'rxId', 'p', 'l', 'm', 'c', 'a', 'b', 'room', 'ward', 'wardId', 'departmentId']);
 function normalize(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  for (const r of rows) for (const k in r) if (typeof r[k] === 'string' && (k === 'f' || k === 't')) r[k] = Number(r[k]);
+  for (const r of rows) for (const k in r) if (INT_COLS.has(k) && r[k] !== null) r[k] = int(r[k] as number | string);
   return rows;
 }
 

@@ -1,5 +1,5 @@
 import type { Driver } from 'neo4j-driver';
-import { readRows } from './driver';
+import { int, ints, readRows } from './driver';
 
 // Read queries of the graph read-model. Semantics = packages/graph/fixtures/golden/README.md:
 //  - presence counts in window [from, to) if f < to AND t > from (epoch ms, open stay t = 9e15);
@@ -97,7 +97,7 @@ const overlapMin = (r: WitnessRow, from: number, to: number) =>
 export async function traceContacts(driver: Driver, p: TraceParams, timeoutMs?: number): Promise<TraceRow[]> {
   const from = ms(p.from);
   const to = ms(p.to);
-  const rows = await readRows<WitnessRow>(driver, traceQuery(p.kind, p.depth), { id: p.id, from, to }, timeoutMs);
+  const rows = await readRows<WitnessRow>(driver, traceQuery(p.kind, p.depth), { id: int(p.id), from: int(from), to: int(to) }, timeoutMs);
   return rows.map((r) => {
     const { f1: _f1, t1: _t1, f2: _f2, t2: _t2, ...rest } = r;
     return { ...rest, overlapMinutes: overlapMin(r, from, to) };
@@ -138,7 +138,7 @@ export async function exposurePath(driver: Driver, p: PathParams, timeoutMs?: nu
   const from = ms(p.from);
   const to = ms(p.to);
   const rows = await readRows<WitnessRow & { aName: string }>(driver, pathQuery(p.aKind, p.bKind, p.maxDepth),
-    { aId: p.aId, bId: p.bId, from, to }, timeoutMs);
+    { aId: int(p.aId), bId: int(p.bId), from: int(from), to: int(to) }, timeoutMs);
   const byPerson = new Map(rows.map((r) => [`${r.kind}:${r.id}`, r]));
   let cur = byPerson.get(`${p.bKind}:${p.bId}`);
   if (!cur) return null;
@@ -199,14 +199,14 @@ ORDER BY a, b, via DESC, classA, classB`;
 export async function drugInteractions(driver: Driver, p: InteractionParams, timeoutMs?: number): Promise<InteractionRow[]> {
   const ids = [...new Set(p.medicationIds)];
   return readRows<InteractionRow>(driver, INTERACTIONS_QUERY,
-    { ids, patientId: p.patientId ?? -1, at: p.at ? ms(p.at) : Date.now() }, timeoutMs);
+    { ids: ints(ids), patientId: int(p.patientId ?? -1), at: int(p.at ? ms(p.at) : Date.now()) }, timeoutMs);
 }
 
 /** Medications the patient takes at `at` (API response field `currentMedicationIds`). */
 export async function currentMedications(driver: Driver, patientId: number, at: string | Date = new Date()): Promise<number[]> {
   const rows = await readRows<{ id: number }>(driver,
     'MATCH (:Patient {id: $patientId})-[t:TAKES]->(m:Medication) WHERE t.f <= $at AND $at < t.t RETURN DISTINCT m.id AS id ORDER BY id',
-    { patientId, at: ms(at) });
+    { patientId: int(patientId), at: int(ms(at)) });
   return rows.map((r) => r.id);
 }
 
@@ -228,7 +228,7 @@ RETURN departmentId, toString(d.year) + '-' + right('0' + toString(d.month), 2) 
 ORDER BY departmentId, month`;
 
 export async function admissionsByDeptMonth(driver: Driver, p: { from: string | Date; to: string | Date }, timeoutMs?: number): Promise<DeptMonthRow[]> {
-  return readRows<DeptMonthRow>(driver, DEPT_MONTH_QUERY, { from: ms(p.from), to: ms(p.to) }, timeoutMs);
+  return readRows<DeptMonthRow>(driver, DEPT_MONTH_QUERY, { from: int(ms(p.from)), to: int(ms(p.to)) }, timeoutMs);
 }
 
 export interface CountRow {
