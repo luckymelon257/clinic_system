@@ -172,6 +172,9 @@ importers:
 
   packages/bench:
     dependencies:
+      '@clinic/redis':
+        specifier: workspace:*
+        version: link:../redis
       neo4j-driver:
         specifier: 5.28.3
         version: 5.28.3

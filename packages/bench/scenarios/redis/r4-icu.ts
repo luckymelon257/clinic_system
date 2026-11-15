@@ -1,5 +1,5 @@
 import type { Scenario } from '../../src/types';
-import { ingestVitals, type VitalsReading } from '../../../redis/src/icu';
+import { ingestVitals, type VitalsReading } from '@clinic/redis';
 import { clearPrefix, explainPg, INPUTS_NOTE, redisCtx } from './common';
 
 const PG_SQL = 'CALL sp_icu_vitals_insert($1, $2, $3, $4, $5, $6, $7, $8, NULL)';

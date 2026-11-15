@@ -12,7 +12,7 @@
     "sync": "tsx sync/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint --no-error-on-unmatched-pattern gen neo4j sync tests index.ts vitest.config.ts"
+    "lint": "eslint --no-error-on-unmatched-pattern gen neo4j sync tests validate.ts index.ts vitest.config.ts"
   },
   "dependencies": {
     "@clinic/db": "workspace:*",

@@ -1,5 +1,5 @@
 import type { Scenario } from '../../src/types';
-import { countsFromPg, readCounts, reconcile } from '../../../redis/src/beds';
+import { countsFromPg, readCounts, reconcile } from '@clinic/redis';
 import { clearPrefix, INPUTS_NOTE, redisCtx } from './common';
 
 const PG_SQL = `SELECT ward_id, (count(*) FILTER (WHERE status = 'available'))::int AS free,
