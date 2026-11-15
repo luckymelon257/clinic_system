@@ -56,6 +56,9 @@ importers:
       pg:
         specifier: ^8.23.1
         version: 8.23.1
+      redis:
+        specifier: 5.12.1
+        version: 5.12.1
       swagger-ui-express:
         specifier: ^5.0.1
         version: 5.0.1(express@5.3.0)

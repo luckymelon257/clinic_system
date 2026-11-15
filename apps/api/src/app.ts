@@ -47,7 +47,8 @@ export function createApp() {
   app.use((_req, _res, next) => next(new HttpError('NOT_FOUND', 'Маршрут не знайдено')));
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const [status, body] = toErrorResponse(err);
-    if (status >= 500) console.error(err);
+    if (status === 503) console.warn(`[degraded] ${body.error.code}: ${body.error.message}`); // expected while an engine is down (D-28)
+    else if (status >= 500) console.error(err);
     res.status(status).json(body);
   });
   return app;
