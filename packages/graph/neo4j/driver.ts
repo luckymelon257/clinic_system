@@ -1,4 +1,4 @@
-import neo4j, { type Driver } from 'neo4j-driver';
+import neo4j, { type Config, type Driver } from 'neo4j-driver';
 
 /** Open interval end in the graph (PG 'infinity'), see fn_epoch_ms in migration 009. */
 export const OPEN_END = 9e15;
@@ -18,10 +18,11 @@ export function neo4jConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Neo4jC
 }
 
 /** Integers come back as JS numbers: ids and epoch ms stay below 2^53. */
-export function createDriver(cfg: Neo4jConfig = neo4jConfigFromEnv(), poolSize = 50): Driver {
+export function createDriver(cfg: Neo4jConfig = neo4jConfigFromEnv(), poolSize = 50, extra: Config = {}): Driver {
   return neo4j.driver(cfg.url, neo4j.auth.basic(cfg.user, cfg.password), {
     disableLosslessIntegers: true,
     maxConnectionPoolSize: poolSize,
+    ...extra,
   });
 }
 
