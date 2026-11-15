@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Anchor, Button, Card, Checkbox, Group, List, NativeSelect, SimpleGrid, Stack, Table, Text, TextInput, Textarea, Title } from '@mantine/core';
+import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Group, List, NativeSelect, SimpleGrid, Stack, Table, Text, TextInput, Textarea, Title } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { Controller, get, useFieldArray } from 'react-hook-form';
+import { Controller, get, useFieldArray, useWatch } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router';
-import { VisitCompleteInput, type VisitCompleteResult } from '@clinic/contracts';
+import { VisitCompleteInput, type InteractionCheckResult, type InteractionSeverity, type VisitCompleteResult } from '@clinic/contracts';
 import { useApi, useApiMutation, useMe } from '../api';
 import { APPT_STATUS, DoctorSelect, ErrorAlert, FormError, StatusBadge, applyApiError, bind, fmtDateTime, fmtTime, useZodForm } from '../ui';
 
@@ -78,6 +78,55 @@ export function DoctorDayPage() {
   );
 }
 
+const SEVERITY: Record<InteractionSeverity, [string, string]> = { minor: ['незначна', 'yellow'], moderate: ['помірна', 'orange'], major: ['серйозна', 'red'] };
+
+/** F-37 / BR-13: interactions of the prescription with each other and with what the patient already takes. */
+function InteractionWarnings({ result, ack, onAck }: { result: InteractionCheckResult; ack: boolean; onAck: (v: boolean) => void }) {
+  if (!result.interactions.length) return null;
+  const pairs = new Map<string, typeof result.interactions>();
+  for (const i of result.interactions) {
+    const k = `${i.medicationAName} + ${i.medicationBName}`;
+    pairs.set(k, [...(pairs.get(k) ?? []), i]);
+  }
+  const worst = result.maxSeverity!;
+  return (
+    <Alert color={SEVERITY[worst][1]} title="Взаємодія препаратів" data-testid="interaction-warning">
+      <Stack gap="xs">
+        {[...pairs].map(([pair, rows]) => (
+          <div key={pair}>
+            <Text size="sm" fw={600}>
+              {pair}
+            </Text>
+            <List size="sm">
+              {rows.map((r, i) => (
+                <List.Item key={i}>
+                  <Badge size="xs" color={SEVERITY[r.severity][1]} mr={6}>
+                    {SEVERITY[r.severity][0]}
+                  </Badge>
+                  {r.via === 'direct' ? 'пряма взаємодія препаратів' : `через класи: ${r.classAName} × ${r.classBName}`}
+                </List.Item>
+              ))}
+            </List>
+          </div>
+        ))}
+        {result.engine === 'postgres' && (
+          <Text size="xs" c="dimmed">
+            Графова база недоступна — перевірку виконано в PostgreSQL.
+          </Text>
+        )}
+        {result.requiresAcknowledgement && (
+          <Checkbox
+            checked={ack}
+            onChange={(e) => onAck(e.currentTarget.checked)}
+            label="Підтверджую, що ознайомлений із взаємодією major"
+            data-testid="interaction-ack"
+          />
+        )}
+      </Stack>
+    </Alert>
+  );
+}
+
 export function VisitPage() {
   const id = Number(useParams().id);
   const appt = useApi('getAppointment', { params: { id } });
@@ -108,7 +157,31 @@ export function VisitPage() {
   const complete = useApiMutation('completeVisit', setResult);
   const errors = form.formState.errors;
   const err = (path: string) => (get(errors, `${path}.root`) ?? get(errors, path))?.message as string | undefined;
-  const submit = form.handleSubmit((body) => complete.mutateAsync({ params: { id }, body }).catch((e) => applyApiError(e, form)));
+
+  // interaction check: re-run (debounced) whenever the set of prescribed medications changes
+  const items = useWatch({ control: form.control, name: 'prescription.items' }) ?? [];
+  const medIds = [...new Set(items.map((x) => Number(x?.medicationId)).filter((x) => x > 0))].sort((x, y) => x - y);
+  const [dMedIds] = useDebouncedValue(medIds.join(','), 300);
+  const patientId = appt.data?.patientId ?? null;
+  const check = useApi(
+    'checkInteractions',
+    { body: { medicationIds: dMedIds ? dMedIds.split(',').map(Number) : [], patientId } },
+    !!dMedIds && !!patientId,
+  );
+  const [ack, setAck] = useState(false);
+  const [ackFor, setAckFor] = useState('');
+  if (ackFor !== dMedIds) {
+    // a new set of medications needs a new confirmation
+    setAckFor(dMedIds);
+    setAck(false);
+  }
+  const needsAck = !!dMedIds && !!check.data?.requiresAcknowledgement;
+  const checkPending = medIds.join(',') !== dMedIds || check.isFetching;
+  const submit = form.handleSubmit((body) =>
+    complete
+      .mutateAsync({ params: { id }, body: { ...body, ...(needsAck ? { interactionsAcknowledged: ack } : {}) } })
+      .catch((e) => applyApiError(e, form)),
+  );
 
   if (appt.error) return <ErrorAlert error={appt.error} />;
   const a = appt.data;
@@ -235,6 +308,16 @@ export function VisitPage() {
             ))}
           </Stack>
           {rx.fields.length > 0 && <TextInput label="Рецепт дійсний до" type="date" w={200} mt="xs" {...bind(form, 'prescription.validUntil')} />}
+          {dMedIds && check.data && (
+            <Stack mt="sm">
+              <InteractionWarnings result={check.data} ack={ack} onAck={setAck} />
+            </Stack>
+          )}
+          {dMedIds && check.error && (
+            <Text size="sm" c="orange" mt="sm">
+              Не вдалося перевірити взаємодії: {String((check.error as Error).message)}
+            </Text>
+          )}
         </Card>
 
         <Card withBorder>
@@ -263,7 +346,12 @@ export function VisitPage() {
           />
         </Card>
 
-        <Button type="submit" w={240} loading={complete.isPending} disabled={a.status === 'completed'}>
+        {needsAck && !ack && (
+          <Text c="red" size="sm" data-testid="ack-required">
+            Є серйозна (major) взаємодія препаратів — підтвердьте її в розділі «Рецепт», щоб завершити прийом.
+          </Text>
+        )}
+        <Button type="submit" w={240} loading={complete.isPending} disabled={a.status === 'completed' || (needsAck && !ack) || (medIds.length > 0 && checkPending)}>
           Завершити прийом
         </Button>
       </Stack>

@@ -1,3 +1,4 @@
+import { seedLab2State, type Lab2State } from './lab2';
 import type {
   Admission,
   Appointment,
@@ -101,6 +102,8 @@ function seed() {
     { id: 6, name: 'Омепразол', form: 'capsule', strength: '20 мг', unitPrice: 60 },
     { id: 7, name: 'Сальбутамол', form: 'inhaler', strength: '100 мкг/доза', unitPrice: 180 },
     { id: 8, name: 'Цефтріаксон', form: 'injection', strength: '1 г', unitPrice: 45 },
+    { id: 11, name: 'Варфарин', form: 'tablet', strength: '5 мг', unitPrice: 110 },
+    { id: 12, name: 'Аспірин', form: 'tablet', strength: '100 мг', unitPrice: 30 },
   ];
   const labTestTypes: LabTestType[] = [
     { id: 1, code: 'HGB', name: 'Гемоглобін', unit: 'г/л', refMin: 120, refMax: 160, price: 150 },
@@ -567,6 +570,9 @@ export function publicUser(u: UserRow): CurrentUser {
 }
 
 export let db: Db = seed();
+/** Lab 2 engines' state (graph, triage queue, ICU alerts) — see lab2.ts. */
+export let lab2: Lab2State = seedLab2State(db);
 export const resetDb = () => {
   db = seed();
+  lab2 = seedLab2State(db);
 };
