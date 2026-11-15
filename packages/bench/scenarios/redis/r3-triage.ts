@@ -1,6 +1,5 @@
 import type { Scenario } from '../../src/types';
-import { keys } from '../../../redis/src/client';
-import { triageCallNext, triageScore } from '../../../redis/src/triage';
+import { keys, triageCallNext, triageScore } from '@clinic/redis';
 import { clearPrefix, explainPg, redisCtx } from './common';
 
 // Both queues are pre-filled with the SAME N entries (esi = 1 + (i·7919) mod 5, arrival t0 + i ms), large enough that

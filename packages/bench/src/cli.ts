@@ -8,7 +8,9 @@ import { DEFAULT_MEASURE, type MeasureConfig } from './types';
 // pnpm bench [--scale x1] [--params params/x1.json] [--scenario S1,S4] [--quick] [--concurrency 1,8,32] [--reps 3] [--out file]
 // Engines come from BENCH_DATABASE_URL / BENCH_NEO4J_URL / BENCH_REDIS_URL (see engines.ts).
 
+// `pnpm bench -- --scale x1` passes a literal '--' through to the script; drop it
 const { values } = parseArgs({
+  args: process.argv.slice(2).filter((a) => a !== '--'),
   options: {
     scale: { type: 'string', default: 'x1' },
     params: { type: 'string' },

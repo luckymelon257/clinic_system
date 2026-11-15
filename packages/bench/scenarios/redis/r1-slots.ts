@@ -1,5 +1,5 @@
 import type { Scenario } from '../../src/types';
-import { cachedSlots, getSlots, invalidateSlots, setSlots } from '../../../redis/src/slots';
+import { cachedSlots, getSlots, invalidateSlots, setSlots } from '@clinic/redis';
 import { clearPrefix, explainPg, INPUTS_NOTE, redisCtx } from './common';
 
 const SQL = 'SELECT slot_start, slot_end FROM fn_doctor_free_slots($1, $2::date)';

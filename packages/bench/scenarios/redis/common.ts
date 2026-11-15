@@ -1,7 +1,7 @@
 // Shared helpers for R1–R4. The Redis library is imported by relative path (bench has no workspace dependency
 // on @clinic/redis; same physical `redis` package via pnpm, so client types match).
 import type { BenchContext } from '../../src/types';
-import type { RedisCtx } from '../../../redis/src/client';
+import type { RedisCtx } from '@clinic/redis';
 
 /** A RedisCtx for the library on the bench connection, under its own sub-prefix per scenario. */
 export async function redisCtx(ctx: BenchContext, sub: string): Promise<RedisCtx> {
