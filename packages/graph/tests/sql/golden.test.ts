@@ -23,6 +23,18 @@ describe('golden: trace', () => {
         'SELECT person_kind AS kind, person_id AS id, hops FROM fn_trace_contacts_cte($1, $2, $3, $4, $5)', args);
       expect(sorted(rows.map(key))).toEqual(want);
     });
+    it(`BFS (materialised window path) ${c.name}`, async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("SET clinic.bfs_small_frontier = '0'");
+        const { rows } = await client.query<Row>(
+          'SELECT person_kind AS kind, person_id AS id, hops FROM fn_trace_contacts($1, $2, $3, $4, $5)', args);
+        expect(sorted(rows.map(key))).toEqual(want);
+      } finally {
+        await client.query('RESET clinic.bfs_small_frontier');
+        client.release();
+      }
+    });
     it(`BFS ${c.name}`, async () => {
       const { rows } = await pool.query<Row & { exposure: string; overlap_minutes: string }>(
         'SELECT person_kind AS kind, person_id AS id, hops, exposure, overlap_minutes FROM fn_trace_contacts($1, $2, $3, $4, $5)', args);

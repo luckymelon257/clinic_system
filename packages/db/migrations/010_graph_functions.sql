@@ -24,22 +24,76 @@ BEGIN
 END $$;
 
 -- ---------- один крок: контакти множини осіб у вікні ----------
--- Для кожної присутності x осіб із (p_kinds[i], p_ids[i]), що перетинає вікно, — усі інші особи y у тому самому
--- місці, чия присутність перетинає вікно і x. Перетин обрізано вікном (ov_from, ov_to).
--- Фільтри period && … збігаються з виразами GiST-індексів 009 у кожній гілці v_presence.
+-- Ті самі факти, що й v_presence, але по джерелах: особа → її присутності (індекси за особою) → хто ще був у
+-- тому самому місці в перетині інтервалів (GiST «місце + період» з 009). Планувальник не проштовхує параметризовані
+-- умови крізь UNION ALL-view з обчислюваними колонками, тому для малих фронтів BFS кроки написано явно.
+-- presences of one person in the window, per source (index lookups by person)
+CREATE FUNCTION fn_person_presence(p_kind text, p_id int, p_from timestamptz, p_to timestamptz)
+RETURNS TABLE (place_kind text, place_id int, f timestamptz, t timestamptz, period tstzrange)
+LANGUAGE sql STABLE AS $$
+  SELECT 'room', b.room_id, a.admitted_at, coalesce(a.discharged_at, 'infinity'), tstzrange(a.admitted_at, a.discharged_at)
+  FROM admissions a JOIN beds b ON b.id = a.bed_id
+  WHERE p_kind = 'patient' AND a.patient_id = p_id AND tstzrange(a.admitted_at, a.discharged_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'ward', b.ward_id, a.admitted_at, coalesce(a.discharged_at, 'infinity'), tstzrange(a.admitted_at, a.discharged_at)
+  FROM admissions a JOIN beds b ON b.id = a.bed_id
+  WHERE p_kind = 'patient' AND a.patient_id = p_id AND tstzrange(a.admitted_at, a.discharged_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'office', ap.doctor_id, ap.starts_at, ap.ends_at, tstzrange(ap.starts_at, ap.ends_at)
+  FROM appointments ap
+  WHERE p_kind = 'patient' AND ap.patient_id = p_id AND ap.status NOT IN ('cancelled', 'no_show')
+    AND tstzrange(ap.starts_at, ap.ends_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'ward', s.ward_id, s.starts_at, s.ends_at, tstzrange(s.starts_at, s.ends_at)
+  FROM staff_shifts s
+  WHERE p_kind = 'staff' AND s.staff_id = p_id AND tstzrange(s.starts_at, s.ends_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'office', ap.doctor_id, ap.starts_at, ap.ends_at, tstzrange(ap.starts_at, ap.ends_at)
+  FROM staff st JOIN appointments ap ON ap.doctor_id = st.doctor_id
+  WHERE p_kind = 'staff' AND st.id = p_id AND ap.status NOT IN ('cancelled', 'no_show')
+    AND tstzrange(ap.starts_at, ap.ends_at) && tstzrange(p_from, p_to)
+$$;
+
+-- who is in a place during [p_f, p_t) ∩ window, per source (GiST lookups by place + period)
+CREATE FUNCTION fn_place_presence(p_place_kind text, p_place_id int, p_period tstzrange, p_from timestamptz, p_to timestamptz)
+RETURNS TABLE (person_kind text, person_id int, f timestamptz, t timestamptz)
+LANGUAGE sql STABLE AS $$
+  SELECT 'patient', a.patient_id, a.admitted_at, coalesce(a.discharged_at, 'infinity')
+  FROM beds b JOIN admissions a ON a.bed_id = b.id
+  WHERE p_place_kind = 'room' AND b.room_id = p_place_id
+    AND tstzrange(a.admitted_at, a.discharged_at) && p_period AND tstzrange(a.admitted_at, a.discharged_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'patient', a.patient_id, a.admitted_at, coalesce(a.discharged_at, 'infinity')
+  FROM beds b JOIN admissions a ON a.bed_id = b.id
+  WHERE p_place_kind = 'ward' AND b.ward_id = p_place_id
+    AND tstzrange(a.admitted_at, a.discharged_at) && p_period AND tstzrange(a.admitted_at, a.discharged_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'staff', s.staff_id, s.starts_at, s.ends_at
+  FROM staff_shifts s
+  WHERE p_place_kind = 'ward' AND s.ward_id = p_place_id
+    AND tstzrange(s.starts_at, s.ends_at) && p_period AND tstzrange(s.starts_at, s.ends_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'patient', ap.patient_id, ap.starts_at, ap.ends_at
+  FROM appointments ap
+  WHERE p_place_kind = 'office' AND ap.doctor_id = p_place_id AND ap.status NOT IN ('cancelled', 'no_show')
+    AND tstzrange(ap.starts_at, ap.ends_at) && p_period AND tstzrange(ap.starts_at, ap.ends_at) && tstzrange(p_from, p_to)
+  UNION ALL
+  SELECT 'staff', st.id, ap.starts_at, ap.ends_at
+  FROM appointments ap JOIN staff st ON st.doctor_id = ap.doctor_id
+  WHERE p_place_kind = 'office' AND ap.doctor_id = p_place_id AND ap.status NOT IN ('cancelled', 'no_show')
+    AND tstzrange(ap.starts_at, ap.ends_at) && p_period AND tstzrange(ap.starts_at, ap.ends_at) && tstzrange(p_from, p_to)
+$$;
+
 CREATE FUNCTION fn_presence_contacts(p_kinds text[], p_ids int[], p_from timestamptz, p_to timestamptz)
 RETURNS TABLE (src_kind text, src_id int, dst_kind text, dst_id int, place_kind text, place_id int,
                ov_from timestamptz, ov_to timestamptz)
 LANGUAGE sql STABLE AS $$
-  SELECT x.person_kind, x.person_id, y.person_kind, y.person_id, x.place_kind, x.place_id,
+  SELECT q.kind, q.id, y.person_kind, y.person_id, x.place_kind, x.place_id,
          greatest(x.f, y.f, p_from), least(x.t, y.t, p_to)
   FROM unnest(p_kinds, p_ids) AS q (kind, id)
-  JOIN v_presence x ON x.person_kind = q.kind AND x.person_id = q.id
-                   AND x.period && tstzrange(p_from, p_to)
-  JOIN v_presence y ON y.place_kind = x.place_kind AND y.place_id = x.place_id
-                   AND y.period && x.period
-                   AND y.period && tstzrange(p_from, p_to)
-  WHERE NOT (y.person_kind = x.person_kind AND y.person_id = x.person_id)
+  CROSS JOIN LATERAL fn_person_presence(q.kind, q.id, p_from, p_to) x
+  CROSS JOIN LATERAL fn_place_presence(x.place_kind, x.place_id, x.period, p_from, p_to) y
+  WHERE NOT (y.person_kind = q.kind AND y.person_id = q.id)
 $$;
 
 -- ---------- трасування: рекурсивний CTE з CYCLE (F-35, «як написав би SQL-розробник») ----------
@@ -75,48 +129,71 @@ END $$;
 
 -- ---------- BFS (спільне ядро трасування і пошуку шляху) ----------
 -- Заповнює сесійну тимчасову таблицю _graph_bfs: кожна досяжна особа один раз, з мінімальним hops і одним
--- детермінованим «свідком» (ребро, яким її досягнуто): room > office > ward, далі найменший батько.
+-- детермінованим «свідком» (ребро, яким її досягнуто): room > office > ward, далі найменший батько, місце, час.
+-- Кожен рівень — один set-based запит. Малий фронт (≤ 32 особи, clinic.bfs_small_frontier) — індексні кроки fn_presence_contacts;
+-- великий — присутності вікна матеріалізуються ОДИН раз (сирі факти, не ребра-контакти: D-24) у тимчасову
+-- таблицю з індексами, і рівень — hash / index join по ній.
 -- p_target_*: зупинитися, щойно ціль досягнуто (пошук шляху).
 CREATE FUNCTION fn_graph_bfs(p_person_kind text, p_person_id int, p_from timestamptz, p_to timestamptz, p_depth int,
                              p_target_kind text DEFAULT NULL, p_target_id int DEFAULT NULL)
 RETURNS int -- досягнута глибина
 LANGUAGE plpgsql VOLATILE AS $$
 DECLARE
+  -- порог переходу на матеріалізоване вікно; налаштування сесії clinic.bfs_small_frontier (тести: 0 = завжди вікно)
+  c_small  constant int := coalesce(nullif(current_setting('clinic.bfs_small_frontier', true), '')::int, 32);
   v_level  int := 0;
   v_kinds  text[] := ARRAY[p_person_kind];
   v_ids    int[] := ARRAY[p_person_id];
   v_found  boolean := false;
+  v_window boolean := false; -- _graph_pres заповнено для цього виклику
 BEGIN
-  CREATE TEMP TABLE IF NOT EXISTS _graph_bfs (
-    kind            text NOT NULL,
-    id              int NOT NULL,
-    hops            int NOT NULL,
-    parent_kind     text,
-    parent_id       int,
-    exposure        text,
-    place_id        int,
-    ov_from         timestamptz,
-    ov_to           timestamptz,
-    PRIMARY KEY (kind, id)
-  );
-  DELETE FROM _graph_bfs;
+  IF to_regclass('pg_temp._graph_bfs') IS NULL THEN
+    CREATE TEMP TABLE _graph_bfs (
+      kind text NOT NULL, id int NOT NULL, hops int NOT NULL, parent_kind text, parent_id int, exposure text,
+      place_id int, ov_from timestamptz, ov_to timestamptz, PRIMARY KEY (kind, id));
+    CREATE TEMP TABLE _graph_pres (
+      person_kind text, person_id int, place_kind text, place_id int, f timestamptz, t timestamptz, period tstzrange);
+    CREATE INDEX ON _graph_pres (person_id, person_kind);
+    CREATE INDEX ON _graph_pres (place_id, place_kind);
+  END IF;
+  TRUNCATE _graph_bfs;
+
   -- індексна особа (hops 0) лише якщо вона присутня у вікні; інакше відповідь порожня
-  IF NOT EXISTS (SELECT 1 FROM v_presence v WHERE v.person_kind = p_person_kind AND v.person_id = p_person_id
-                 AND v.period && tstzrange(p_from, p_to)) THEN
+  IF NOT EXISTS (SELECT 1 FROM fn_person_presence(p_person_kind, p_person_id, p_from, p_to)) THEN
     RETURN 0;
   END IF;
   INSERT INTO _graph_bfs (kind, id, hops) VALUES (p_person_kind, p_person_id, 0);
 
   WHILE v_level < p_depth AND cardinality(v_ids) > 0 AND NOT v_found LOOP
     v_level := v_level + 1;
-    INSERT INTO _graph_bfs (kind, id, hops, parent_kind, parent_id, exposure, place_id, ov_from, ov_to)
-    SELECT DISTINCT ON (c.dst_kind, c.dst_id)
-           c.dst_kind, c.dst_id, v_level, c.src_kind, c.src_id, c.place_kind, c.place_id, c.ov_from, c.ov_to
-    FROM fn_presence_contacts(v_kinds, v_ids, p_from, p_to) c
-    WHERE NOT EXISTS (SELECT 1 FROM _graph_bfs b WHERE b.kind = c.dst_kind AND b.id = c.dst_id)
-    ORDER BY c.dst_kind, c.dst_id,
-             CASE c.place_kind WHEN 'room' THEN 1 WHEN 'office' THEN 2 ELSE 3 END,
-             c.src_kind, c.src_id, c.place_id, c.ov_from;
+    IF cardinality(v_ids) <= c_small THEN
+      INSERT INTO _graph_bfs (kind, id, hops, parent_kind, parent_id, exposure, place_id, ov_from, ov_to)
+      SELECT DISTINCT ON (c.dst_kind, c.dst_id)
+             c.dst_kind, c.dst_id, v_level, c.src_kind, c.src_id, c.place_kind, c.place_id, c.ov_from, c.ov_to
+      FROM fn_presence_contacts(v_kinds, v_ids, p_from, p_to) c
+      WHERE NOT EXISTS (SELECT 1 FROM _graph_bfs b WHERE b.kind = c.dst_kind AND b.id = c.dst_id)
+      ORDER BY c.dst_kind, c.dst_id, CASE c.place_kind WHEN 'room' THEN 1 WHEN 'office' THEN 2 ELSE 3 END,
+               c.src_kind, c.src_id, c.place_id, c.ov_from;
+    ELSE
+      IF NOT v_window THEN
+        TRUNCATE _graph_pres;
+        INSERT INTO _graph_pres
+        SELECT v.person_kind, v.person_id, v.place_kind, v.place_id, v.f, v.t, v.period
+        FROM v_presence v WHERE v.period && tstzrange(p_from, p_to);
+        ANALYZE _graph_pres;
+        v_window := true;
+      END IF;
+      INSERT INTO _graph_bfs (kind, id, hops, parent_kind, parent_id, exposure, place_id, ov_from, ov_to)
+      SELECT DISTINCT ON (y.person_kind, y.person_id)
+             y.person_kind, y.person_id, v_level, x.person_kind, x.person_id, x.place_kind, x.place_id,
+             greatest(x.f, y.f, p_from), least(x.t, y.t, p_to)
+      FROM unnest(v_kinds, v_ids) AS q (kind, id)
+      JOIN _graph_pres x ON x.person_id = q.id AND x.person_kind = q.kind
+      JOIN _graph_pres y ON y.place_id = x.place_id AND y.place_kind = x.place_kind AND y.period && x.period
+      WHERE NOT EXISTS (SELECT 1 FROM _graph_bfs b WHERE b.kind = y.person_kind AND b.id = y.person_id)
+      ORDER BY y.person_kind, y.person_id, CASE x.place_kind WHEN 'room' THEN 1 WHEN 'office' THEN 2 ELSE 3 END,
+               x.person_kind, x.person_id, x.place_id, greatest(x.f, y.f, p_from);
+    END IF;
 
     SELECT coalesce(array_agg(b.kind), '{}'), coalesce(array_agg(b.id), '{}')
       INTO v_kinds, v_ids
