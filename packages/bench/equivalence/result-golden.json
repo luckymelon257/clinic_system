@@ -1,0 +1,34 @@
+{
+ "scale": "golden",
+ "db": "clinic_bench_golden",
+ "neo4j": "bolt://localhost:7688",
+ "finishedAt": "2026-11-15T22:02:05.284Z",
+ "seconds": 31,
+ "total": 108,
+ "failed": 0,
+ "skipped": 0,
+ "groups": [
+  {
+   "group": "counts",
+   "checks": 24,
+   "failed": 0
+  },
+  {
+   "group": "trace",
+   "checks": 40,
+   "failed": 0
+  },
+  {
+   "group": "path",
+   "checks": 28,
+   "failed": 0
+  },
+  {
+   "group": "interactions",
+   "checks": 16,
+   "failed": 0
+  }
+ ],
+ "failures": [],
+ "skips": []
+}
