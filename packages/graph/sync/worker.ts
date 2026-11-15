@@ -59,7 +59,7 @@ async function applyOne(tx: ManagedTransaction, e: OutboxEvent): Promise<void> {
       return;
     case 'office':
       if (del) await tx.run('MATCH (n:Office {id: $id}) DETACH DELETE n', { id: num(p.id) });
-      else await tx.run('MERGE (n:Office {id: $id}) SET n:Place, n.departmentId = $dep', { id: num(p.id), dep: num(p.departmentId) });
+      else await tx.run('MERGE (n:Office {id: $id}) SET n:Place, n.departmentId = $dep, n.name = coalesce($name, n.name)', { id: num(p.id), dep: num(p.departmentId), name: p.name ?? null });
       return;
     case 'presence': {
       // replace ALL edges of this source row (a cancelled appointment carries an empty list)

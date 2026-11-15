@@ -77,6 +77,14 @@ describe('graph outbox (D-23, D-32)', () => {
       expect(edges.every((e) => e.t === 9e15)).toBe(true);
     }));
 
+  it('office events carry the doctor name, like v_graph_places (012)', () =>
+    tx(ADMIN, async (c) => {
+      const d = await one<{ id: number; name: string }>(c, 'SELECT d.id, u.full_name AS name FROM doctors d JOIN users u ON u.id = d.user_id ORDER BY d.id LIMIT 1');
+      await c.query('UPDATE doctors SET consultation_fee = consultation_fee + 1 WHERE id = $1', [d.id]);
+      const ev = await lastOutbox(c);
+      expect(ev).toMatchObject({ entity: 'office', entity_key: String(d.id), payload: { id: d.id, name: d.name } });
+    }));
+
   it('a cancelled appointment replaces its edges with an empty list', () =>
     tx(REGISTRAR, async (c) => {
       const a = await one<{ id: number }>(c, "SELECT id FROM appointments WHERE status = 'scheduled' ORDER BY id LIMIT 1");
