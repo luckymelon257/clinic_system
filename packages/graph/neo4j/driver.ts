@@ -25,6 +25,13 @@ export function createDriver(cfg: Neo4jConfig = neo4jConfigFromEnv(), poolSize =
   });
 }
 
+/**
+ * JS numbers are sent to Neo4j as FLOATs; ids and epoch ms must be stored and compared as INTEGERs
+ * (otherwise a float property, float index entries and float comparisons). Every integer goes through this.
+ */
+export const int = (v: number | string | bigint) => neo4j.int(typeof v === 'number' ? v : String(v));
+export const ints = (vs: readonly (number | string)[]) => vs.map((v) => int(v));
+
 /** Run a read query in a managed transaction and return plain objects (all records consumed). */
 export async function readRows<T = Record<string, unknown>>(
   driver: Driver,
