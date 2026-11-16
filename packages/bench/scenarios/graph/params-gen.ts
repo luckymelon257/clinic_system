@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
-import { pathHops, paramsPath, pgPath, shuffle, stream, type GraphParams, type PathPair, type PatientMeds, type Person, type Window } from './common';
+import { pathHops, paramsPath, pgPath, shuffle, stream, type GraphParams, type PathPair, type PatientMeds, type Window } from './common';
 
 // Generates packages/bench/params/x{N}.json from clinic_bench_x{N}: the questions both engines answer.
 // Deterministic: mulberry32 seed 2026 + N, one stream per list (same PRNG as the data generator and validate.ts).
