@@ -42,6 +42,26 @@ export function Freshness({ asOf, lagMs, tookMs, engine }: { asOf: string; lagMs
 }
 
 /** Person selector: patients through the fuzzy search, staff by id. */
+const GRAPH_MAX_NODES = 80;
+
+/**
+ * At most GRAPH_MAX_NODES contacts for the picture: nearest rings first, longest overlap first within a ring, and a
+ * person is drawn only if its witness parent is drawn (so every edge has both ends). The table always lists everyone.
+ */
+function graphSubset(contacts: TraceContact[]): TraceContact[] {
+  if (contacts.length <= GRAPH_MAX_NODES) return contacts;
+  const sorted = [...contacts].sort((a, b) => a.hops - b.hops || b.overlapMinutes - a.overlapMinutes);
+  const kept = new Set<string>();
+  const out: TraceContact[] = [];
+  for (const c of sorted) {
+    if (out.length >= GRAPH_MAX_NODES) break;
+    if (c.hops > 1 && !kept.has(`${c.parentKind}:${c.parentId}`)) continue;
+    kept.add(`${c.kind}:${c.id}`);
+    out.push(c);
+  }
+  return out;
+}
+
 function PersonInput({ label, kind, id, onKind, onId }: { label: string; kind: PersonKind; id?: number; onKind: (k: PersonKind) => void; onId: (id?: number) => void }) {
   return (
     <Stack gap={4}>
@@ -83,16 +103,18 @@ function ContactGraph({ result }: { result: TraceResult }) {
       .then(({ default: cytoscape }) => {
         if (destroyed) return;
         const idx = `${result.index.kind}:${result.index.id}`;
-        const maxHops = Math.max(1, ...result.contacts.map((c) => c.hops));
+        const shown = graphSubset(result.contacts);
+        const maxHops = Math.max(1, ...shown.map((c) => c.hops));
+        const edgeLabels = shown.length <= 40; // beyond that edge labels only add noise; the table has the places
         // short labels keep rings readable: "Шевченко Т. Г."
         const short = (n: string) => n.split(' ').map((w, i) => (i === 0 || w.startsWith('(') ? w : `${w[0]}.`)).join(' ');
         cy = cytoscape({
           container: el,
           elements: [
             { data: { id: idx, label: short(result.index.name), kind: result.index.kind, hops: 0 } },
-            ...result.contacts.map((c) => ({ data: { id: `${c.kind}:${c.id}`, label: short(c.name), kind: c.kind, hops: c.hops } })),
-            ...result.contacts.map((c) => ({
-              data: { id: `e-${c.kind}:${c.id}`, source: `${c.parentKind}:${c.parentId}`, target: `${c.kind}:${c.id}`, label: EXPOSURE_LABEL[c.exposure] },
+            ...shown.map((c) => ({ data: { id: `${c.kind}:${c.id}`, label: short(c.name), kind: c.kind, hops: c.hops } })),
+            ...shown.map((c) => ({
+              data: { id: `e-${c.kind}:${c.id}`, source: `${c.parentKind}:${c.parentId}`, target: `${c.kind}:${c.id}`, label: edgeLabels ? EXPOSURE_LABEL[c.exposure] : '' },
             })),
           ],
           style: [
@@ -102,7 +124,7 @@ function ContactGraph({ result }: { result: TraceResult }) {
             { selector: 'node[hops = 0]', style: { width: 30, height: 30, 'border-color': '#1f1f1d', 'font-weight': 'bold' } },
             { selector: 'edge', style: { width: 1.5, 'line-color': '#b9b8b0', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#b9b8b0', 'curve-style': 'bezier', label: 'data(label)', 'font-size': 8, color: '#6b6a63', 'text-rotation': 'autorotate' } },
           ],
-          layout: { name: 'concentric', concentric: (n: { data(k: string): number }) => maxHops + 1 - n.data('hops'), levelWidth: () => 1, minNodeSpacing: 60, spacingFactor: 1.2, animate: false },
+          layout: { name: 'concentric', concentric: (n: { data(k: string): number }) => maxHops + 1 - n.data('hops'), levelWidth: () => 1, minNodeSpacing: 24, spacingFactor: 1, animate: false },
           maxZoom: 1.6,
           minZoom: 0.2,
           wheelSensitivity: 0.3,
@@ -125,6 +147,8 @@ function ContactGraph({ result }: { result: TraceResult }) {
         ))}
         <Text size="xs" c="dimmed">
           кільця — кількість кроків від індексної особи (у центрі); підпис ребра — місце контакту
+          {result.contacts.length > GRAPH_MAX_NODES &&
+            ` · на графі ${graphSubset(result.contacts).length} найближчих із ${result.contacts.length} осіб, повний список — у таблиці`}
         </Text>
       </Group>
       <div ref={ref} data-testid="trace-graph" data-nodes={result.contacts.length + 1} style={{ height: 460, border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, background: '#fcfcfb' }} />
