@@ -13,9 +13,14 @@
     "report": "tsx src/report-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint src tests scenarios vitest.config.ts"
+    "lint": "eslint src tests scenarios equivalence vitest.config.ts",
+    "params-gen": "tsx scenarios/graph/params-gen.ts",
+    "prepare-graph": "tsx scenarios/graph/prepare.ts",
+    "equivalence": "tsx equivalence/cli.ts"
   },
   "dependencies": {
+    "@clinic/db": "workspace:*",
+    "@clinic/graph": "workspace:*",
     "@clinic/redis": "workspace:*",
     "neo4j-driver": "5.28.3",
     "pg": "^8.23.1",
