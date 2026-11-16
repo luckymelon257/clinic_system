@@ -1,7 +1,7 @@
 # Звіт до лабораторної роботи 2: NoSQL (Neo4j + Redis)
 
 Вимоги й моделі: [`06-nosql-requirements.md`](06-nosql-requirements.md). Рішення й відхилення: [`05-decisions.md`](05-decisions.md)
-(D-21…D-57). Лаб 1 зафіксована тегом `lab1` (`b28a82b`).
+(D-21…D-57). Стан Лаб 1 — коміт `b28a82b`.
 
 PostgreSQL 16 лишається джерелом істини; Neo4j 5.26 Community — графова read-model для обходів; Redis 7.4 —
 ефемерний оперативний стан. Запуск з нуля:
