@@ -3,10 +3,8 @@ dist/
 coverage/
 .turbo/
 .env
-.agent/
+.notes/
 *.log
 playwright-report/
 test-results/
 .DS_Store
-.claude/worktrees/
-.playwright-mcp/

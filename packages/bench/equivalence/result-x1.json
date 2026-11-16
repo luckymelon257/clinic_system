@@ -1,0 +1,106 @@
+{
+ "scale": "x1",
+ "db": "clinic_bench_x1",
+ "neo4j": "bolt://localhost:7688",
+ "finishedAt": "2026-11-16T08:44:34.125Z",
+ "seconds": 649,
+ "total": 1059,
+ "failed": 0,
+ "skipped": 1,
+ "groups": [
+  {
+   "group": "counts",
+   "checks": 12,
+   "failed": 0
+  },
+  {
+   "group": "trace d1",
+   "checks": 80,
+   "failed": 0
+  },
+  {
+   "group": "trace d2",
+   "checks": 80,
+   "failed": 0
+  },
+  {
+   "group": "trace d3",
+   "checks": 45,
+   "failed": 0
+  },
+  {
+   "group": "trace d4",
+   "checks": 40,
+   "failed": 0
+  },
+  {
+   "group": "trace d5",
+   "checks": 40,
+   "failed": 0
+  },
+  {
+   "group": "window d3",
+   "checks": 20,
+   "failed": 0
+  },
+  {
+   "group": "window d14",
+   "checks": 20,
+   "failed": 0
+  },
+  {
+   "group": "window d60",
+   "checks": 20,
+   "failed": 0
+  },
+  {
+   "group": "path d2",
+   "checks": 200,
+   "failed": 0
+  },
+  {
+   "group": "path d4",
+   "checks": 200,
+   "failed": 0
+  },
+  {
+   "group": "path unreachable",
+   "checks": 100,
+   "failed": 0
+  },
+  {
+   "group": "interactions m1",
+   "checks": 50,
+   "failed": 0
+  },
+  {
+   "group": "interactions m5",
+   "checks": 50,
+   "failed": 0
+  },
+  {
+   "group": "interactions m15",
+   "checks": 50,
+   "failed": 0
+  },
+  {
+   "group": "interactions patient",
+   "checks": 50,
+   "failed": 0
+  },
+  {
+   "group": "dept-month",
+   "checks": 2,
+   "failed": 0
+  }
+ ],
+ "failures": [],
+ "skips": [
+  {
+   "group": "trace d3",
+   "name": "patient 9308 pg-cte",
+   "status": "skip",
+   "detail": "timeout 30 s"
+  }
+ ]
+}

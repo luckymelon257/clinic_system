@@ -16,7 +16,12 @@
     "db:migrate": "pnpm --filter @clinic/db migrate",
     "db:seed": "pnpm --filter @clinic/db seed",
     "db:reset": "pnpm --filter @clinic/db reset",
-    "e2e": "pnpm --filter @clinic/e2e e2e"
+    "e2e": "pnpm --filter @clinic/e2e e2e",
+    "nosql:up": "docker compose up -d --wait db neo4j redis",
+    "graph:sync": "pnpm --filter @clinic/graph sync",
+    "bench": "pnpm --filter @clinic/bench bench",
+    "bench:report": "pnpm --filter @clinic/bench report",
+    "simulate": "pnpm --filter @clinic/redis simulate"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

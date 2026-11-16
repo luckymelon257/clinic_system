@@ -1,0 +1,338 @@
+{
+  "schema": 1,
+  "runId": "2026-11-16T10-45-57-649Z",
+  "startedAt": "2026-11-16T10:45:57.649Z",
+  "finishedAt": "2026-11-16T10:53:46.116Z",
+  "scale": "x1",
+  "paramsFile": null,
+  "paramsSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "git": {
+    "commit": "5d404a290a864fc57f10985211094da118ae3d11",
+    "dirty": true
+  },
+  "environment": {
+    "client": {
+      "node": "v22.23.4",
+      "platform": "linux 6.18.44-fc-v470",
+      "arch": "x64",
+      "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "cpuCount": 4,
+      "totalMemBytes": 16869146624
+    },
+    "containers": {
+      "note": "docker not available; engines run without container limits"
+    },
+    "postgres": {
+      "version": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+      "database": "clinic_bench_x1",
+      "databaseSize": "196 MB",
+      "settings": {
+        "effective_cache_size": "262144 8kB",
+        "jit": "off",
+        "maintenance_work_mem": "65536 kB",
+        "max_connections": "200",
+        "max_parallel_workers_per_gather": "2",
+        "random_page_cost": "1.1",
+        "server_version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "shared_buffers": "131072 8kB",
+        "statement_timeout": "30000 ms",
+        "TimeZone": "Europe/Kyiv",
+        "work_mem": "32768 kB"
+      }
+    },
+    "neo4j": {
+      "components": [
+        {
+          "name": "Neo4j Kernel",
+          "versions": [
+            "5.26.33"
+          ],
+          "edition": "community"
+        }
+      ],
+      "settings": {
+        "db.transaction.timeout": "1m",
+        "dbms.cypher.planner": "DEFAULT",
+        "server.cypher.parallel.worker_limit": "0",
+        "server.memory.heap.initial_size": "1.00GiB",
+        "server.memory.heap.max_size": "1.00GiB",
+        "server.memory.pagecache.size": "1.46GiB"
+      },
+      "counts": {
+        "nodes": 65230,
+        "rels": 623548
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S2",
+      "title": "Відстеження контактів глибини 3: вікно 3 / 14 / 60 днів",
+      "why": "Вікно — другий множник вартості: кількість присутностей, що перетинають вікно, росте лінійно з його довжиною, а розмір кроку — надлінійно. Особи однакові для всіх вікон (активні в 3-денному ⊂ 14 ⊂ 60), тож різниця — лише від вікна. PG фільтрує вікно GiST-індексом, Neo4j — після розгортання ребер (індексу на час у ребрі обходу не використати).",
+      "expect": "Обидва рушії сповільнюються з вікном; відносна перевага Neo4j зменшується на 60 днях, бо зростає частка ребер, що відкидаються фільтром часу після обходу.",
+      "falsifiedIf": "Час Neo4j не залежить від вікна (тоді вартість визначає не фільтр, а щось інше) або PG сповільнюється сильніше за Neo4j.",
+      "measure": {
+        "warmupMs": 10000,
+        "warmupIterations": 100,
+        "minIterations": 500,
+        "maxMs": 30000,
+        "minSamples": 3,
+        "repetitions": 3,
+        "concurrency": [
+          1,
+          8
+        ],
+        "timeoutMs": 30000
+      },
+      "variants": [
+        {
+          "id": "d14",
+          "label": "вікно 14 д",
+          "params": {
+            "depth": 3,
+            "window": {
+              "from": "2026-04-30T21:00:00.000Z",
+              "to": "2026-05-14T21:00:00.000Z"
+            }
+          },
+          "runs": [
+            {
+              "engine": "postgres",
+              "label": "pg-bfs",
+              "concurrency": 1,
+              "rep": 0,
+              "n": 109,
+              "ok": 109,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30244.822097999975,
+              "throughput": 3.603922669699153,
+              "min": 174.7062309999019,
+              "mean": 277.46866259629917,
+              "p50": 269.9695989997126,
+              "p95": 398.2785699996166,
+              "p99": 477.4435120001435,
+              "max": 605.7862169998698
+            },
+            {
+              "engine": "neo4j",
+              "label": "neo4j",
+              "concurrency": 1,
+              "rep": 0,
+              "n": 104,
+              "ok": 104,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30024.50911899982,
+              "throughput": 3.4638368137112265,
+              "min": 132.13809499982744,
+              "mean": 288.6915542596208,
+              "p50": 276.4529019999318,
+              "p95": 431.96555199986324,
+              "p99": 468.2806489998475,
+              "max": 556.4233290003613
+            },
+            {
+              "engine": "neo4j",
+              "label": "neo4j",
+              "concurrency": 1,
+              "rep": 1,
+              "n": 101,
+              "ok": 101,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30354.09188399976,
+              "throughput": 3.327393235349567,
+              "min": 128.49367599980906,
+              "mean": 300.52931821782437,
+              "p50": 285.4803120000288,
+              "p95": 432.97045999998227,
+              "p99": 616.0647060000338,
+              "max": 726.842952999752
+            },
+            {
+              "engine": "postgres",
+              "label": "pg-bfs",
+              "concurrency": 1,
+              "rep": 1,
+              "n": 110,
+              "ok": 110,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30211.129983999766,
+              "throughput": 3.641042227095032,
+              "min": 146.14242199994624,
+              "mean": 274.641239499995,
+              "p50": 270.2201720001176,
+              "p95": 398.02738099964336,
+              "p99": 424.82534700026736,
+              "max": 613.3508259998634
+            },
+            {
+              "engine": "postgres",
+              "label": "pg-bfs",
+              "concurrency": 1,
+              "rep": 2,
+              "n": 101,
+              "ok": 101,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30026.146762000397,
+              "throughput": 3.36373497407335,
+              "min": 189.06010300014168,
+              "mean": 297.2820024257065,
+              "p50": 284.522770000156,
+              "p95": 443.57203099969774,
+              "p99": 526.1211330001242,
+              "max": 559.5988509999588
+            },
+            {
+              "engine": "neo4j",
+              "label": "neo4j",
+              "concurrency": 1,
+              "rep": 2,
+              "n": 100,
+              "ok": 100,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30082.787750000134,
+              "throughput": 3.324160009073612,
+              "min": 120.40162500040606,
+              "mean": 300.8191335200286,
+              "p50": 287.1258350000717,
+              "p95": 453.7367540001869,
+              "p99": 562.3135110000148,
+              "max": 574.4936080002226
+            },
+            {
+              "engine": "postgres",
+              "label": "pg-bfs",
+              "concurrency": 8,
+              "rep": 0,
+              "n": 427,
+              "ok": 427,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30483.853808999993,
+              "throughput": 14.007415291892436,
+              "min": 292.7807710003108,
+              "mean": 567.7502620140618,
+              "p50": 547.8772669997998,
+              "p95": 796.4516599997878,
+              "p99": 930.4577760002576,
+              "max": 1330.0049729999155
+            },
+            {
+              "engine": "neo4j",
+              "label": "neo4j",
+              "concurrency": 8,
+              "rep": 0,
+              "n": 458,
+              "ok": 458,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30562.381374000106,
+              "throughput": 14.985743237587753,
+              "min": 207.30151000013575,
+              "mean": 528.8357263034765,
+              "p50": 507.843305000104,
+              "p95": 816.3022670000792,
+              "p99": 1007.8274969998747,
+              "max": 1068.7161580002867
+            },
+            {
+              "engine": "neo4j",
+              "label": "neo4j",
+              "concurrency": 8,
+              "rep": 1,
+              "n": 478,
+              "ok": 478,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30415.841626000125,
+              "throughput": 15.715494770047563,
+              "min": 150.51776299998164,
+              "mean": 507.02734714644185,
+              "p50": 494.95549299987033,
+              "p95": 771.8123119999655,
+              "p99": 892.695642999839,
+              "max": 1059.327951000072
+            },
+            {
+              "engine": "postgres",
+              "label": "pg-bfs",
+              "concurrency": 8,
+              "rep": 1,
+              "n": 430,
+              "ok": 430,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30571.14854700025,
+              "throughput": 14.065549396644869,
+              "min": 296.03219499997795,
+              "mean": 563.4927872372054,
+              "p50": 544.1619210001081,
+              "p95": 812.1810639998876,
+              "p99": 903.825393000152,
+              "max": 1610.2683719997294
+            },
+            {
+              "engine": "postgres",
+              "label": "pg-bfs",
+              "concurrency": 8,
+              "rep": 2,
+              "n": 411,
+              "ok": 411,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30389.76431800006,
+              "throughput": 13.524290471596778,
+              "min": 263.9849080001004,
+              "mean": 588.776461503643,
+              "p50": 567.885556999594,
+              "p95": 902.256374000106,
+              "p99": 1099.7252100002952,
+              "max": 1250.595728999935
+            },
+            {
+              "engine": "neo4j",
+              "label": "neo4j",
+              "concurrency": 8,
+              "rep": 2,
+              "n": 434,
+              "ok": 434,
+              "timeouts": 0,
+              "errors": 0,
+              "firstError": null,
+              "wallMs": 30507.14587399969,
+              "throughput": 14.226175132623107,
+              "min": 192.58475200040266,
+              "mean": 557.8637322488665,
+              "p50": 541.5134369996376,
+              "p95": 884.472666000016,
+              "p99": 1057.4797340002842,
+              "max": 1097.2456459999084
+            }
+          ],
+          "explain": {
+            "pg-bfs": "Function Scan on fn_trace_contacts  (cost=0.25..10.25 rows=1000 width=40) (actual time=378.366..378.538 rows=1806 loops=1)\n  Buffers: shared hit=6490 dirtied=4 written=1, local hit=219969 read=3 dirtied=294 written=295\nPlanning Time: 0.068 ms\nExecution Time: 379.400 ms",
+            "neo4j": "total dbHits=868695, records=1806\nProduceResults@neo4j  rows=1806  dbHits=0\n  Projection@neo4j  rows=1806  dbHits=25167\n    Projection@neo4j  rows=1806  dbHits=0\n      Unwind@neo4j  rows=1806  dbHits=0\n        Projection@neo4j  rows=1  dbHits=0\n          Apply@neo4j  rows=1  dbHits=0\n            Projection@neo4j  rows=1  dbHits=0\n              Apply@neo4j  rows=1  dbHits=0\n                Projection@neo4j  rows=1  dbHits=0\n                  Apply@neo4j  rows=1  dbHits=0\n                    Projection@neo4j  rows=1  dbHits=0\n                      NodeUniqueIndexSeek@neo4j  rows=1  dbHits=2\n                    EagerAggregation@neo4j  rows=1  dbHits=0\n                      Projection@neo4j  rows=39  dbHits=0\n                        EagerAggregation@neo4j  rows=39  dbHits=0\n                          Sort@neo4j  rows=44  dbHits=0\n                            Projection@neo4j  rows=44  dbHits=85\n                              Filter@neo4j  rows=44  dbHits=0\n                                Projection@neo4j  rows=319  dbHits=605\n                                  Filter@neo4j  rows=319  dbHits=11032\n                                    Expand(All)@neo4j  rows=7039  dbHits=7045\n                                      EagerAggregation@neo4j  rows=2  dbHits=0\n                                        Filter@neo4j  rows=2  dbHits=12\n                                          Expand(All)@neo4j  rows=6  dbHits=13\n                                            Unwind@neo4j  rows=1  dbHits=0\n                                              Argument@neo4j  rows=1  dbHits=0\n                EagerAggregation@neo4j  rows=1  dbHits=0\n                  Projection@neo4j  rows=264  dbHits=0\n                    EagerAggregation@neo4j  rows=264  dbHits=0\n                      Sort@neo4j  rows=417  dbHits=0\n                        Projection@neo4j  rows=417  dbHits=789\n                          Filter@neo4j  rows=417  dbHits=0\n                            Projection@neo4j  rows=1155  dbHits=51463\n                              Filter@neo4j  rows=1155  dbHits=44496\n                                Expand(All)@neo4j  rows=35051  dbHits=35090\n                                  EagerAggregation@neo4j  rows=14  dbHits=0\n                                    Filter@neo4j  rows=320  dbHits=10903\n                                      Expand(All)@neo4j  rows=6931  dbHits=7121\n                                        Unwind@neo4j  rows=39  dbHits=0\n                                          Argument@neo4j  rows=1  dbHits=0\n            EagerAggregation@neo4j  rows=1  dbHits=0\n              Projection@neo4j  rows=1503  dbHits=0\n                EagerAggregation@neo4j  rows=1503  dbHits=0\n                  Sort@neo4j  rows=2380  dbHits=0\n                    Projection@neo4j  rows=2380  dbHits=4691\n                      Filter@neo4j  rows=2380  dbHits=0\n                        Projection@neo4j  rows=5600  dbHits=164200\n                          Filter@neo4j  rows=5600  dbHits=228804\n                            Expand(All)@neo4j  rows=187659  dbHits=187814\n                              EagerAggregation@neo4j  rows=60  dbHits=0\n                                Filter@neo4j  rows=1687  dbHits=53663\n                                  Expand(All)@neo4j  rows=34215  dbHits=35700\n                                    Unwind@neo4j  rows=264  dbHits=0\n                                      Argument@neo4j  rows=1  dbHits=0"
+          }
+        }
+      ],
+      "tables": [],
+      "error": null
+    }
+  ]
+}

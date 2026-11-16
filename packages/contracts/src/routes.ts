@@ -24,6 +24,7 @@ const CLINICAL = ['admin', 'doctor'] as const;
 const INPATIENT = ['admin', 'registrar', 'doctor'] as const;
 const FINANCE = ['admin', 'cashier'] as const;
 const ADMIN = ['admin'] as const;
+const TRIAGE = ['admin', 'registrar', 'doctor'] as const;
 
 const Paged = M.Paged;
 
@@ -111,6 +112,20 @@ export const routes = {
   deletedRecords: { method: 'GET', path: '/api/admin/deleted', roles: ADMIN, query: I.DeletedQuery, output: z.array(M.DeletedRecord), features: ['F-07'], summary: 'Soft-видалені записи' },
   softDelete: { method: 'DELETE', path: '/api/admin/records/:table/:id', roles: ADMIN, params: I.TableIdParams, output: M.Ok, features: ['F-03', 'F-07'], summary: 'Soft delete (sp_soft_delete)' },
   restore: { method: 'POST', path: '/api/admin/records/:table/:id/restore', roles: ADMIN, params: I.TableIdParams, output: M.Ok, features: ['F-07'], summary: 'Відновити (sp_restore)' },
+
+  // ---------- Lab 2: NoSQL (docs/06-nosql-requirements.md F-35..F-45) ----------
+  logout: { method: 'POST', path: '/api/auth/logout', roles: 'any', output: M.Ok, features: ['F-42'], summary: 'Вихід: jti → Redis SET auth:revoked:<jti> EX ttl (BR-16)' },
+  health: { method: 'GET', path: '/api/health', roles: 'public', output: M.Health, features: ['F-45'], summary: 'Стан PostgreSQL / Neo4j / Redis і відставання графа' },
+  traceContacts: { method: 'GET', path: '/api/graph/trace', roles: CLINICAL, query: I.TraceContactsQuery, output: M.TraceResult, features: ['F-35'], summary: 'Відстеження контактів (Neo4j; 503 GRAPH_UNAVAILABLE)' },
+  exposurePath: { method: 'GET', path: '/api/graph/path', roles: CLINICAL, query: I.ExposurePathQuery, output: M.ExposurePathResult, features: ['F-36'], summary: 'Найкоротший ланцюг експозиції (Neo4j)' },
+  checkInteractions: { method: 'POST', path: '/api/interactions/check', roles: CLINICAL, body: I.InteractionCheckInput, output: M.InteractionCheckResult, features: ['F-37', 'F-39'], summary: 'Взаємодії ліків напряму і через класи (Neo4j, fallback PG)' },
+  triageList: { method: 'GET', path: '/api/triage', roles: TRIAGE, output: M.TriageQueue, features: ['F-40'], summary: 'Черга тріажу (Redis ZSET)' },
+  triageAdd: { method: 'POST', path: '/api/triage', roles: TRIAGE, body: I.TriageAddInput, output: M.TriageEntry, status: 201, features: ['F-40'], summary: 'Прибуття з ESI 1–5 (ZADD)' },
+  triageCallNext: { method: 'POST', path: '/api/triage/next', roles: TRIAGE, output: M.TriageCallResult, features: ['F-40'], summary: 'Викликати наступного (ZPOPMIN, BR-14)' },
+  bedCounts: { method: 'GET', path: '/api/inpatient/bed-counts', roles: INPATIENT, output: M.BedCounts, features: ['F-43'], summary: 'Лічильники вільних / зайнятих ліжок (Redis hash, fallback v_beds)' },
+  icuBeds: { method: 'GET', path: '/api/icu/beds', roles: CLINICAL, output: z.array(M.IcuBed), features: ['F-44'], summary: 'Ліжка ICU з останніми показниками' },
+  icuAlerts: { method: 'GET', path: '/api/icu/alerts', roles: CLINICAL, query: I.IcuAlertsQuery, output: z.array(M.IcuAlert), features: ['F-44'], summary: 'Збережені критичні алерти (PG icu_alerts)' },
+  icuStream: { method: 'GET', path: '/api/icu/stream', roles: CLINICAL, output: M.IcuStreamEvent, features: ['F-44'], summary: 'SSE text/event-stream: показники й алерти (Authorization header, без токена в URL)' },
 } as const satisfies Record<string, RouteDef>;
 
 export type Routes = typeof routes;
