@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="298" viewBox="0 0 480 298" role="img" aria-label="S2: p50 latency, concurrency 1" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<rect width="480" height="298" fill="#fcfcfb"/>
+<text x="16" y="24" font-size="15" font-weight="600" fill="#1f1f1d">S2: p50 latency, concurrency 1</text>
+<rect x="64" y="35" width="10" height="10" rx="2" fill="#2a78d6"/><text x="78" y="44" font-size="12" fill="#1f1f1d">pg-bfs</text>
+<rect x="130" y="35" width="10" height="10" rx="2" fill="#eb6834"/><text x="144" y="44" font-size="12" fill="#1f1f1d">neo4j</text>
+<line x1="64" x2="464" y1="250.0" y2="250.0" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="250.0" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">100</text>
+<line x1="64" x2="464" y1="153.0" y2="153.0" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="153.0" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">1,000</text>
+<line x1="64" x2="464" y1="56.0" y2="56.0" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="56.0" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">10,000</text>
+<text transform="translate(14 153) rotate(-90)" font-size="11" text-anchor="middle" fill="#6b6a63">ms (log)</text>
+<line x1="64" x2="464" y1="250" y2="250" stroke="#6b6a63" stroke-width="1"/>
+<g><title>pg-bfs · вікно 3 д: 192</title><path d="M76,250 V226.58154346144406 Q76,222.58154346144406 80,222.58154346144406 H92 Q96,222.58154346144406 96,226.58154346144406 V250 Z" fill="#2a78d6"/></g>
+<g><title>neo4j · вікно 3 д: 137</title><path d="M98,250 V240.6655268927682 Q98,236.6655268927682 102,236.6655268927682 H114 Q118,236.6655268927682 118,240.6655268927682 V250 Z" fill="#eb6834"/></g>
+<text x="98" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">вікно 3 д</text>
+<g><title>pg-bfs · вікно 14 д: 708</title><path d="M144,250 V171.55051153390946 Q144,167.55051153390946 148,167.55051153390946 H160 Q164,167.55051153390946 164,171.55051153390946 V250 Z" fill="#2a78d6"/></g>
+<g><title>neo4j · вікно 14 д: 659</title><path d="M166,250 V174.60005383887653 Q166,170.60005383887653 170,170.60005383887653 H182 Q186,170.60005383887653 186,174.60005383887653 V250 Z" fill="#eb6834"/></g>
+<text x="166" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">вікно 14 д</text>
+<g><title>pg-bfs · вікно 60 д: 6216</title><path d="M212,250 V80.02806622038301 Q212,76.02806622038301 216,76.02806622038301 H228 Q232,76.02806622038301 232,80.02806622038301 V250 Z" fill="#2a78d6"/></g>
+<g><title>neo4j · вікно 60 д: 3385</title><path d="M234,250 V105.62901385065706 Q234,101.62901385065706 238,101.62901385065706 H250 Q254,101.62901385065706 254,105.62901385065706 V250 Z" fill="#eb6834"/></g>
+<text x="234" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">вікно 60 д</text>
+</svg>

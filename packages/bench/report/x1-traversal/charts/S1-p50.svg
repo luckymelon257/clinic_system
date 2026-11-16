@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="538" height="298" viewBox="0 0 538 298" role="img" aria-label="S1: p50 latency, concurrency 1" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<rect width="538" height="298" fill="#fcfcfb"/>
+<text x="16" y="24" font-size="15" font-weight="600" fill="#1f1f1d">S1: p50 latency, concurrency 1</text>
+<rect x="64" y="35" width="10" height="10" rx="2" fill="#2a78d6"/><text x="78" y="44" font-size="12" fill="#1f1f1d">pg-cte</text>
+<rect x="130" y="35" width="10" height="10" rx="2" fill="#eb6834"/><text x="144" y="44" font-size="12" fill="#1f1f1d">pg-bfs</text>
+<rect x="196" y="35" width="10" height="10" rx="2" fill="#1baf7a"/><text x="210" y="44" font-size="12" fill="#1f1f1d">neo4j</text>
+<line x1="64" x2="522" y1="250.0" y2="250.0" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="250.0" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">1</text>
+<line x1="64" x2="522" y1="211.2" y2="211.2" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="211.2" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">10</text>
+<line x1="64" x2="522" y1="172.4" y2="172.4" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="172.4" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">100</text>
+<line x1="64" x2="522" y1="133.6" y2="133.6" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="133.6" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">1,000</text>
+<line x1="64" x2="522" y1="94.8" y2="94.8" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="94.8" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">10,000</text>
+<line x1="64" x2="522" y1="56.0" y2="56.0" stroke="#e6e5e0" stroke-width="1"/><text x="58" y="56.0" dy="4" font-size="11" text-anchor="end" fill="#6b6a63">100,000</text>
+<text transform="translate(14 153) rotate(-90)" font-size="11" text-anchor="middle" fill="#6b6a63">ms (log)</text>
+<line x1="64" x2="522" y1="250" y2="250" stroke="#6b6a63" stroke-width="1"/>
+<g><title>pg-cte · глибина 1: 40.6</title><path d="M76,250 V191.58285176767572 Q76,187.58285176767572 80,187.58285176767572 H92 Q96,187.58285176767572 96,191.58285176767572 V250 Z" fill="#2a78d6"/></g>
+<g><title>pg-bfs · глибина 1: 4.34</title><path d="M98,250 V229.26536355134303 Q98,225.26536355134303 102,225.26536355134303 H114 Q118,225.26536355134303 118,229.26536355134303 V250 Z" fill="#eb6834"/></g>
+<g><title>neo4j · глибина 1: 9.26</title><path d="M120,250 V216.49655828773558 Q120,212.49655828773558 124,212.49655828773558 H136 Q140,212.49655828773558 140,216.49655828773558 V250 Z" fill="#1baf7a"/></g>
+<text x="109" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">глибина 1</text>
+<g><title>pg-cte · глибина 2: 130</title><path d="M166,250 V171.99483368055246 Q166,167.99483368055246 170,167.99483368055246 H182 Q186,167.99483368055246 186,171.99483368055246 V250 Z" fill="#2a78d6"/></g>
+<g><title>pg-bfs · глибина 2: 134</title><path d="M188,250 V171.5176026922549 Q188,167.5176026922549 192,167.5176026922549 H204 Q208,167.5176026922549 208,171.5176026922549 V250 Z" fill="#eb6834"/></g>
+<g><title>neo4j · глибина 2: 109</title><path d="M210,250 V175.0001575492747 Q210,171.0001575492747 214,171.0001575492747 H226 Q230,171.0001575492747 230,175.0001575492747 V250 Z" fill="#1baf7a"/></g>
+<text x="199" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">глибина 2</text>
+<g><title>pg-cte · глибина 3: 13424</title><path d="M256,250 V93.83820848095681 Q256,89.83820848095681 260,89.83820848095681 H272 Q276,89.83820848095681 276,93.83820848095681 V250 Z" fill="#2a78d6"/></g>
+<g><title>pg-bfs · глибина 3: 272</title><path d="M278,250 V159.55637105328867 Q278,155.55637105328867 282,155.55637105328867 H294 Q298,155.55637105328867 298,159.55637105328867 V250 Z" fill="#eb6834"/></g>
+<g><title>neo4j · глибина 3: 288</title><path d="M300,250 V158.57130956622052 Q300,154.57130956622052 304,154.57130956622052 H316 Q320,154.57130956622052 320,158.57130956622052 V250 Z" fill="#1baf7a"/></g>
+<text x="289" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">глибина 3</text>
+<g><title>pg-cte · глибина 4: no data</title><rect x="346" y="244" width="20" height="6" fill="none" stroke="#2a78d6" stroke-dasharray="2 2"/><text transform="translate(359 240) rotate(-90)" font-size="10" fill="#6b6a63">no data</text></g>
+<g><title>pg-bfs · глибина 4: 646</title><path d="M368,250 V144.96098754141687 Q368,140.96098754141687 372,140.96098754141687 H384 Q388,140.96098754141687 388,144.96098754141687 V250 Z" fill="#eb6834"/></g>
+<g><title>neo4j · глибина 4: 624</title><path d="M390,250 V145.5461022607379 Q390,141.5461022607379 394,141.5461022607379 H406 Q410,141.5461022607379 410,145.5461022607379 V250 Z" fill="#1baf7a"/></g>
+<text x="379" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">глибина 4</text>
+<g><title>pg-cte · глибина 5: no data</title><rect x="436" y="244" width="20" height="6" fill="none" stroke="#2a78d6" stroke-dasharray="2 2"/><text transform="translate(449 240) rotate(-90)" font-size="10" fill="#6b6a63">no data</text></g>
+<g><title>pg-bfs · глибина 5: 1139</title><path d="M458,250 V135.40231422595232 Q458,131.40231422595232 462,131.40231422595232 H474 Q478,131.40231422595232 478,135.40231422595232 V250 Z" fill="#eb6834"/></g>
+<g><title>neo4j · глибина 5: 855</title><path d="M480,250 V140.24201551861285 Q480,136.24201551861285 484,136.24201551861285 H496 Q500,136.24201551861285 500,140.24201551861285 V250 Z" fill="#1baf7a"/></g>
+<text x="469" y="266" font-size="11" text-anchor="middle" fill="#1f1f1d">глибина 5</text>
+</svg>

@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "runId": "2026-11-16T11-34-50-050Z",
+  "startedAt": "2026-11-16T11:34:50.050Z",
+  "finishedAt": "2026-11-16T11:35:29.383Z",
+  "scale": "x1",
+  "paramsFile": null,
+  "paramsSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "git": {
+    "commit": "5d404a290a864fc57f10985211094da118ae3d11",
+    "dirty": true
+  },
+  "environment": {
+    "client": {
+      "node": "v22.23.4",
+      "platform": "linux 6.18.44-fc-v470",
+      "arch": "x64",
+      "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "cpuCount": 4,
+      "totalMemBytes": 16869146624
+    },
+    "containers": {
+      "note": "docker not available; engines run without container limits"
+    },
+    "postgres": {
+      "version": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+      "database": "clinic_bench_x1",
+      "databaseSize": "191 MB",
+      "settings": {
+        "effective_cache_size": "262144 8kB",
+        "jit": "off",
+        "maintenance_work_mem": "65536 kB",
+        "max_connections": "200",
+        "max_parallel_workers_per_gather": "2",
+        "random_page_cost": "1.1",
+        "server_version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "shared_buffers": "131072 8kB",
+        "statement_timeout": "30000 ms",
+        "TimeZone": "Europe/Kyiv",
+        "work_mem": "32768 kB"
+      }
+    },
+    "neo4j": {
+      "components": [
+        {
+          "name": "Neo4j Kernel",
+          "versions": [
+            "5.26.33"
+          ],
+          "edition": "community"
+        }
+      ],
+      "settings": {
+        "db.transaction.timeout": "1m",
+        "dbms.cypher.planner": "DEFAULT",
+        "server.cypher.parallel.worker_limit": "0",
+        "server.memory.heap.initial_size": "1.00GiB",
+        "server.memory.heap.max_size": "1.00GiB",
+        "server.memory.pagecache.size": "1.46GiB"
+      },
+      "counts": {
+        "nodes": 65230,
+        "rels": 623548
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S6",
+      "title": "Ціна синхронізації: накладні витрати outbox на запис і відставання графа при 10 / 50 / 200 записів/с",
+      "why": "Граф — read-model, і за нього платить кожен запис у PG (тригер будує payload з v_presence і вставляє рядок outbox у тій самій транзакції). Без цієї ціни порівняння читання було б нечесним. Записом обрано вставку зміни персоналу: вона дає ребро PRESENT, тобто проходить повний шлях тригер → outbox → воркер → Neo4j. Темпи 10 / 50 / 200 записів/с — від реального навантаження лікарні (~1 запис/с для присутностей) до 200× запасу.",
+      "expect": "Накладні витрати тригера — десятки відсотків від часу маленької вставки (але < 1 мс абсолютно); p95 відставання ≤ 5 с (BR-11) на всіх темпах, з ростом при 200/с через пакетування.",
+      "falsifiedIf": "p95 відставання > 5 с при 50 записах/с або тригер подвоює час запису.",
+      "measure": {
+        "warmupMs": 10000,
+        "warmupIterations": 100,
+        "minIterations": 500,
+        "maxMs": 30000,
+        "minSamples": 5,
+        "repetitions": 3,
+        "concurrency": [
+          1,
+          8,
+          32
+        ],
+        "timeoutMs": 30000
+      },
+      "variants": [],
+      "tables": [
+        {
+          "title": "Вставка зміни персоналу (2000 × 3 повтори в транзакції з ROLLBACK, по одній, 1 клієнт)",
+          "columns": [
+            "режим",
+            "n",
+            "p50, мкс",
+            "p95, мкс",
+            "p99, мкс"
+          ],
+          "rows": [
+            [
+              "без outbox-тригера",
+              6000,
+              260,
+              526,
+              671.3
+            ],
+            [
+              "з outbox-тригером",
+              6000,
+              615.6,
+              980.2,
+              1363.6
+            ],
+            [
+              "накладні витрати p50",
+              null,
+              "+355.6 мкс (136.8 %)",
+              null,
+              null
+            ]
+          ]
+        },
+        {
+          "title": "Відставання графа (подія створена → застосована в Neo4j і підтверджена), 10 с на кожен темп",
+          "columns": [
+            "записів/с",
+            "досягнуто/с",
+            "подій",
+            "p50, мс",
+            "p95, мс",
+            "max, мс"
+          ],
+          "rows": [
+            [
+              10,
+              10.1,
+              100,
+              42,
+              281.6,
+              681.6
+            ],
+            [
+              50,
+              50.1,
+              500,
+              51.1,
+              83.8,
+              97.6
+            ],
+            [
+              200,
+              200,
+              2000,
+              87,
+              135.9,
+              168.1
+            ]
+          ],
+          "chart": {
+            "x": "записів/с",
+            "y": [
+              "p50, мс",
+              "p95, мс"
+            ],
+            "yLabel": "мс"
+          }
+        }
+      ],
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "schema": 1,
+  "runId": "2026-11-16T11-35-32-101Z",
+  "startedAt": "2026-11-16T11:35:32.101Z",
+  "finishedAt": "2026-11-16T11:36:18.716Z",
+  "scale": "x1",
+  "paramsFile": null,
+  "paramsSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "git": {
+    "commit": "5d404a290a864fc57f10985211094da118ae3d11",
+    "dirty": true
+  },
+  "environment": {
+    "client": {
+      "node": "v22.23.4",
+      "platform": "linux 6.18.44-fc-v470",
+      "arch": "x64",
+      "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "cpuCount": 4,
+      "totalMemBytes": 16869146624
+    },
+    "containers": {
+      "note": "docker not available; engines run without container limits"
+    },
+    "postgres": {
+      "version": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+      "database": "clinic_bench_x1",
+      "databaseSize": "201 MB",
+      "settings": {
+        "effective_cache_size": "262144 8kB",
+        "jit": "off",
+        "maintenance_work_mem": "65536 kB",
+        "max_connections": "200",
+        "max_parallel_workers_per_gather": "2",
+        "random_page_cost": "1.1",
+        "server_version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "shared_buffers": "131072 8kB",
+        "statement_timeout": "30000 ms",
+        "TimeZone": "Europe/Kyiv",
+        "work_mem": "32768 kB"
+      }
+    },
+    "neo4j": {
+      "components": [
+        {
+          "name": "Neo4j Kernel",
+          "versions": [
+            "5.26.33"
+          ],
+          "edition": "community"
+        }
+      ],
+      "settings": {
+        "db.transaction.timeout": "1m",
+        "dbms.cypher.planner": "DEFAULT",
+        "server.cypher.parallel.worker_limit": "0",
+        "server.memory.heap.initial_size": "1.00GiB",
+        "server.memory.heap.max_size": "1.00GiB",
+        "server.memory.pagecache.size": "1.46GiB"
+      },
+      "counts": {
+        "nodes": 65230,
+        "rels": 623548
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S7",
+      "title": "Повний ETL PostgreSQL → Neo4j",
+      "why": "Початкове завантаження і відновлення графа після збою — одноразова, але реальна ціна read-model. Час по сутностях показує, що домінує (ребра PRESENT), і як ETL масштабується з даними ×1 / ×5 / ×10. UNWIND пакетами по 10 000 — компроміс між кількістю round-trip і розміром транзакції в heap 1 ГБ.",
+      "expect": "Час росте приблизно лінійно з кількістю ребер; ×10 — хвилини, не години.",
+      "falsifiedIf": "Надлінійне зростання (ознака відсутнього індексу при MERGE) або ×10 > 30 хв.",
+      "measure": {
+        "warmupMs": 10000,
+        "warmupIterations": 100,
+        "minIterations": 500,
+        "maxMs": 30000,
+        "minSamples": 5,
+        "repetitions": 3,
+        "concurrency": [
+          1,
+          8,
+          32
+        ],
+        "timeoutMs": 30000
+      },
+      "variants": [],
+      "tables": [
+        {
+          "title": "Повний ETL (x1), підтверджено подій outbox: 0",
+          "columns": [
+            "сутність",
+            "рядків",
+            "с",
+            "рядків/с"
+          ],
+          "rows": [
+            [
+              "Patient",
+              64000,
+              3,
+              21208
+            ],
+            [
+              "Staff",
+              360,
+              0.1,
+              2777
+            ],
+            [
+              "Ward",
+              18,
+              0.1,
+              253
+            ],
+            [
+              "Room",
+              112,
+              0.1,
+              1110
+            ],
+            [
+              "Office",
+              60,
+              0.1,
+              597
+            ],
+            [
+              "Medication",
+              600,
+              0.1,
+              6248
+            ],
+            [
+              "DrugClass",
+              80,
+              0.1,
+              1011
+            ],
+            [
+              "IN",
+              112,
+              0.2,
+              675
+            ],
+            [
+              "PRESENT patient→room",
+              23760,
+              1.4,
+              16515
+            ],
+            [
+              "PRESENT patient→ward",
+              23760,
+              1.3,
+              17868
+            ],
+            [
+              "PRESENT patient→office",
+              127317,
+              5.9,
+              21687
+            ],
+            [
+              "PRESENT staff→room",
+              0,
+              0,
+              0
+            ],
+            [
+              "PRESENT staff→ward",
+              101481,
+              3.8,
+              26951
+            ],
+            [
+              "PRESENT staff→office",
+              127317,
+              4.6,
+              27762
+            ],
+            [
+              "TAKES",
+              218559,
+              8.6,
+              25383
+            ],
+            [
+              "IN_CLASS",
+              692,
+              0.1,
+              5026
+            ],
+            [
+              "INTERACTS med",
+              350,
+              0.1,
+              2958
+            ],
+            [
+              "INTERACTS class",
+              200,
+              0.1,
+              1965
+            ],
+            [
+              "очистка + схема",
+              null,
+              16.5,
+              null
+            ],
+            [
+              "усього",
+              688778,
+              46.3,
+              null
+            ]
+          ]
+        }
+      ],
+      "error": null
+    }
+  ]
+}
