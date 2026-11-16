@@ -26,6 +26,7 @@ import {
   at,
   computeRevenue,
   db,
+  lab2,
   localDate,
   makeInvoice,
   nextId,
@@ -34,6 +35,19 @@ import {
   round,
   type PatientRow,
 } from './db';
+import {
+  makeAlert,
+  mockBedCounts,
+  mockHealth,
+  mockIcuBeds,
+  mockInteractions,
+  mockPath,
+  mockTrace,
+  triageAdd,
+  triageCallNext,
+  triageItems,
+  vitalsAt,
+} from './lab2';
 
 class MockError extends Error {
   constructor(
@@ -618,19 +632,22 @@ const impl: Impl = {
     audit(user, params.table, params.id, 'RESTORE', { deleted_at: 'set' }, { deleted_at: null });
     return ok;
   },
-  // ---------- Lab 2: placeholders (contract routes exist; mocks are added separately) ----------
+  // ---------- Lab 2 (in-memory stand-ins for Neo4j / Redis, see lab2.ts) ----------
   logout: () => ok,
-  health: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
-  traceContacts: () => fail('GRAPH_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
-  exposurePath: () => fail('GRAPH_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
-  checkInteractions: () => fail('GRAPH_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
-  triageList: () => fail('QUEUE_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
-  triageAdd: () => fail('QUEUE_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
-  triageCallNext: () => fail('QUEUE_UNAVAILABLE', 'Ще не реалізовано (Лаб 2)'),
-  bedCounts: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
-  icuBeds: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
-  icuAlerts: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
-  icuStream: () => fail('INTERNAL', 'Ще не реалізовано (Лаб 2)'),
+  health: () => mockHealth(),
+  traceContacts: ({ query }) => mockTrace(db, lab2, query),
+  exposurePath: ({ query }) => mockPath(db, lab2, query),
+  checkInteractions: ({ body }) => mockInteractions(db, body),
+  triageList: () => {
+    const items = triageItems(lab2);
+    return { items, total: items.length, source: 'redis' };
+  },
+  triageAdd: ({ body }) => triageAdd(lab2, body),
+  triageCallNext: () => triageCallNext(lab2),
+  bedCounts: () => mockBedCounts(db),
+  icuBeds: () => mockIcuBeds(db, lab2),
+  icuAlerts: ({ query }) => lab2.alerts.filter((a) => !query.bedId || a.bedId === query.bedId).slice(0, query.limit),
+  icuStream: () => ({ type: 'ping', at: nowIso() }), // documentation shape only; the real mock streams (icuStreamHandler)
 };
 
 function parse(schema: z.ZodType | undefined, value: unknown) {
@@ -650,8 +667,43 @@ const userFromToken = (header: string | null) => {
   return u ? publicUser(u) : null;
 };
 
+/**
+ * GET /api/icu/stream as a real streamed text/event-stream response: a few vitals per ICU bed, one critical alert
+ * (also stored in icuAlerts), a ping, then the stream ends — the page reconnects with backoff, so mock mode keeps
+ * "living" like the real SSE endpoint.
+ */
+const icuStreamHandler = http.get(`*${routes.icuStream.path}`, ({ request }) => {
+  if (!userFromToken(request.headers.get('Authorization'))) {
+    const body: ErrorEnvelope = { error: { code: 'UNAUTHENTICATED', message: 'Потрібно увійти в систему' } };
+    return HttpResponse.json(body, { status: 401 });
+  }
+  const beds = db.beds.filter((b) => b.wardType === 'icu' && b.patientId);
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(ctl) {
+      const send = (e: unknown) => ctl.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
+      for (let tick = 0; tick < 3; tick++) {
+        for (const b of beds) send({ type: 'vitals', bedId: b.id, vitals: { ...vitalsAt(b.id, tick), at: nowIso() } });
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      const b = beds[0];
+      if (b) {
+        const vitals = { ...vitalsAt(b.id, 3, true), at: nowIso() };
+        const alert = makeAlert(db, b.id, vitals, `${Date.now()}-0`);
+        lab2.alerts.unshift(alert);
+        send({ type: 'vitals', bedId: b.id, vitals });
+        send({ type: 'alert', alert });
+      }
+      ctl.enqueue(enc.encode(': keep-alive\n\n'));
+      send({ type: 'ping', at: nowIso() });
+      ctl.close();
+    },
+  });
+  return new HttpResponse(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
+});
+
 /** One MSW handler per contract route ('*' prefix: matches any origin, so VITE_API_URL may be set). */
-export const handlers = (Object.keys(routes) as RouteName[]).map((name) => {
+const jsonHandlers = (Object.keys(routes) as RouteName[]).filter((n) => n !== 'icuStream').map((name) => {
   const route: RouteDef = routes[name];
   const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
   return http[method](`*${route.path}`, async ({ request, params }) => {
@@ -675,3 +727,5 @@ export const handlers = (Object.keys(routes) as RouteName[]).map((name) => {
     }
   });
 });
+
+export const handlers = [icuStreamHandler, ...jsonHandlers];

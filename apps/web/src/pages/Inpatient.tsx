@@ -4,7 +4,7 @@ import { Controller, get } from 'react-hook-form';
 import { Link } from 'react-router';
 import { AdmitInput, DischargeInput, TransferInput, type Bed } from '@clinic/contracts';
 import { useApi, useApiMutation } from '../api';
-import { DoctorSelect, ErrorAlert, FormError, PatientPicker, applyApiError, bind, useZodForm } from '../ui';
+import { DoctorSelect, ErrorAlert, FormError, PatientPicker, applyApiError, bind, fmtDateTime, useZodForm } from '../ui';
 
 const BED_COLOR: Record<Bed['status'], string> = { available: 'green', occupied: 'red', maintenance: 'gray' };
 const BED_LABEL: Record<Bed['status'], string> = { available: 'Вільне', occupied: 'Зайняте', maintenance: 'Обслуговування' };
@@ -72,6 +72,55 @@ function OccupiedBed({ bed, beds, onClose, onDischarged }: { bed: Bed; beds: Bed
   );
 }
 
+/** F-43: live free / occupied counters per ward (Redis hash; falls back to v_beds when Redis is down). */
+function BedCounters() {
+  const counts = useApi('bedCounts');
+  if (counts.error) return <ErrorAlert error={counts.error} />;
+  const d = counts.data;
+  if (!d) return null;
+  const free = d.items.reduce((s, w) => s + w.free, 0);
+  const total = d.items.reduce((s, w) => s + w.total, 0);
+  return (
+    <Card withBorder data-testid="bed-counters">
+      <Group justify="space-between" mb="xs">
+        <Title order={4}>
+          Вільних ліжок: {free} з {total}
+        </Title>
+        <Group gap="xs">
+          <Badge variant="light" color={d.source === 'redis' ? 'teal' : 'gray'} data-testid="bed-counters-source">
+            джерело: {d.source === 'redis' ? 'Redis (лічильники)' : 'PostgreSQL (резерв)'}
+          </Badge>
+          <Text size="xs" c="dimmed">
+            звірено з v_beds: {fmtDateTime(d.reconciledAt)}
+          </Text>
+        </Group>
+      </Group>
+      <SimpleGrid cols={{ base: 2, sm: 3, lg: 6 }} spacing="xs">
+        {d.items.map((w) => (
+          <Paper key={w.wardId} withBorder p="xs">
+            <Text size="xs" c="dimmed">
+              {w.departmentName}
+            </Text>
+            <Text fw={600} size="sm">
+              Палата {w.wardNumber}
+            </Text>
+            <Text size="sm">
+              <Text span c="green" fw={700}>
+                {w.free}
+              </Text>{' '}
+              вільних ·{' '}
+              <Text span c="red" fw={700}>
+                {w.occupied}
+              </Text>{' '}
+              зайнятих
+            </Text>
+          </Paper>
+        ))}
+      </SimpleGrid>
+    </Card>
+  );
+}
+
 export function InpatientPage() {
   const beds = useApi('listBeds');
   const occupancy = useApi('occupancy');
@@ -83,6 +132,7 @@ export function InpatientPage() {
   return (
     <Stack>
       <Title order={2}>Стаціонар — карта ліжок</Title>
+      <BedCounters />
       <Group gap="xs">
         {(['available', 'occupied', 'maintenance'] as const).map((s) => (
           <Badge key={s} color={BED_COLOR[s]}>
