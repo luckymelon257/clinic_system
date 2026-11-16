@@ -187,6 +187,12 @@ importers:
 
   packages/bench:
     dependencies:
+      '@clinic/db':
+        specifier: workspace:*
+        version: link:../db
+      '@clinic/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@clinic/redis':
         specifier: workspace:*
         version: link:../redis
