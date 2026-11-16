@@ -101,6 +101,10 @@ importers:
         version: 3.2.7(@types/node@22.20.5)(jsdom@26.1.0)(msw@2.15.0(@types/node@22.20.5)(typescript@5.9.3))(tsx@4.23.15)
 
   apps/e2e:
+    dependencies:
+      '@clinic/redis':
+        specifier: workspace:*
+        version: link:../../packages/redis
     devDependencies:
       '@playwright/test':
         specifier: 1.62.1
