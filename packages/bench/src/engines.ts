@@ -41,12 +41,15 @@ export class Engines {
   constructor(readonly config: EngineConfig) {}
 
   get pg(): pg.Pool {
-    this._pg ??= new pg.Pool({
+    if (this._pg) return this._pg;
+    this._pg = new pg.Pool({
       connectionString: this.config.pgUrl,
       max: this.config.poolSize,
       // Same timeout as Neo4j: a query that exceeds it is recorded as `timeout` (SQLSTATE 57014)
       options: `-c statement_timeout=${this.config.timeoutMs}`,
     });
+    // An idle client dies when the server restarts (S8); without a listener the pool's 'error' event kills the process.
+    this._pg.on('error', () => {});
     return this._pg;
   }
 
