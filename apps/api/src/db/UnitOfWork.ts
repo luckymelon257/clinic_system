@@ -3,7 +3,9 @@ import { AdmissionRepository } from '../repositories/AdmissionRepository';
 import { AppointmentRepository } from '../repositories/AppointmentRepository';
 import { AuditRepository } from '../repositories/AuditRepository';
 import { DoctorRepository } from '../repositories/DoctorRepository';
+import { GraphRepository } from '../repositories/GraphRepository';
 import { InvoiceRepository } from '../repositories/InvoiceRepository';
+import { Lab2Repository } from '../repositories/Lab2Repository';
 import { LabOrderRepository } from '../repositories/LabOrderRepository';
 import { MedicalRecordRepository } from '../repositories/MedicalRecordRepository';
 import { PatientRepository } from '../repositories/PatientRepository';
@@ -33,6 +35,8 @@ export class Repositories {
   get admissions() { return this.repo('admissions', AdmissionRepository); }
   get invoices() { return this.repo('invoices', InvoiceRepository); }
   get audit() { return this.repo('audit', AuditRepository); }
+  get graph() { return this.repo('graph', GraphRepository); }
+  get lab2() { return this.repo('lab2', Lab2Repository); }
 }
 
 /** Read-only access outside a transaction. Never call procedures through it — writes go through UnitOfWork.run. */

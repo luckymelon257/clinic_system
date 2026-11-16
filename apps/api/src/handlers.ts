@@ -1,9 +1,11 @@
 import type { CurrentUser, RouteBody, RouteName, RouteOutput, RouteParams, RouteQuery } from '@clinic/contracts';
 import bcrypt from 'bcryptjs';
-import { signToken } from './auth';
+import { cachedSlots, invalidateSlots } from '@clinic/redis';
+import { signToken, type TokenInfo } from './auth';
 import { reads, UnitOfWork } from './db/UnitOfWork';
 import { HttpError, notFound } from './errors';
-import { lab2Pending } from './lab2-pending';
+import { lab2Handlers } from './lab2-handlers';
+import { afterCommit, localDate, redisCtx } from './nosql';
 import { InpatientService } from './services/InpatientService';
 import { RegistrationService } from './services/RegistrationService';
 import { VisitService } from './services/VisitService';
@@ -12,11 +14,22 @@ export type Ctx<N extends RouteName> = {
   params: RouteParams<N>;
   query: RouteQuery<N>;
   body: RouteBody<N>;
-  user: CurrentUser; // guaranteed by authenticate() for every non-public route (only `login` is public)
+  user: CurrentUser; // guaranteed by authenticate() for every non-public route (`login`, `health` are public)
+  token: TokenInfo; // jti / exp of the bearer token (logout revokes it)
 };
 type Handlers = { [N in RouteName]: (ctx: Ctx<N>) => Promise<RouteOutput<N>> };
 
 const ok = { ok: true as const };
+/** BR-18: drop the cached free slots of that doctor-day after the booking transaction committed. */
+const dropSlots = (doctorId: number, startsAt: string | Date) =>
+  afterCommit('slot cache', (ctx) => invalidateSlots(ctx, doctorId, localDate(startsAt)));
+
+/** Appointment → doctor + start, read before a write that frees or moves its slot. */
+async function slotOf(id: number) {
+  const a = await reads.appointments.findById(id);
+  return a ? { doctorId: a.doctorId, startsAt: a.startsAt as string | Date } : null;
+}
+
 async function found<T>(p: Promise<T | null>, what?: string): Promise<T> {
   const row = await p;
   if (row === null) throw notFound(what);
@@ -71,31 +84,47 @@ export const handlers: Handlers = {
   addInsurance: async ({ params, body, user }) => ({
     id: await UnitOfWork.run(user.id, (uow) => uow.patients.addInsurance(params.id, body)),
   }),
-  register: ({ body, user }) => RegistrationService.register(user.id, body),
+  async register({ body, user }) {
+    const r = await RegistrationService.register(user.id, body);
+    if (body.appointment) await dropSlots(body.appointment.doctorId, body.appointment.startsAt);
+    return r;
+  },
 
   // ---------- doctors ----------
   listDoctors: ({ query }) => reads.doctors.list(query),
   getDoctor: ({ params }) => found(reads.doctors.findById(params.id), 'Лікаря не знайдено'),
   doctorSchedule: ({ params }) => reads.doctors.schedule(params.id),
-  freeSlots: ({ params, query }) => reads.doctors.freeSlots(params.id, query.date),
+  // F-41: cache-aside, TTL 60 s; Redis down → straight from PG (cachedSlots never throws for a Redis failure)
+  async freeSlots({ params, query }) {
+    const ctx = await redisCtx().catch(() => null);
+    return (await cachedSlots(ctx, params.id, query.date, () => reads.doctors.freeSlots(params.id, query.date))).slots;
+  },
 
   // ---------- appointments ----------
   listAppointments: ({ query }) => reads.appointments.list(query),
   todayAppointments: ({ query }) => reads.appointments.today(query),
   getAppointment: ({ params }) => found(reads.appointments.findById(params.id), 'Запис на прийом не знайдено'),
-  bookAppointment: async ({ body, user }) => ({
-    id: await UnitOfWork.run(user.id, (uow) => uow.appointments.book(body.patientId, body.doctorId, body.startsAt, body.reason)),
-  }),
+  async bookAppointment({ body, user }) {
+    const id = await UnitOfWork.run(user.id, (uow) => uow.appointments.book(body.patientId, body.doctorId, body.startsAt, body.reason));
+    await dropSlots(body.doctorId, body.startsAt);
+    return { id };
+  },
   async rescheduleAppointment({ params, body, user }) {
+    const old = await slotOf(params.id);
     await UnitOfWork.run(user.id, (uow) => uow.appointments.reschedule(params.id, body.startsAt));
+    if (old) await Promise.all([dropSlots(old.doctorId, old.startsAt), dropSlots(old.doctorId, body.startsAt)]);
     return ok;
   },
   async setAppointmentStatus({ params, body, user }) {
     await UnitOfWork.run(user.id, (uow) => uow.appointments.setStatus(params.id, body.status));
+    const slot = body.status === 'cancelled' || body.status === 'no_show' ? await slotOf(params.id) : null;
+    if (slot) await dropSlots(slot.doctorId, slot.startsAt);
     return ok;
   },
   async cancelAppointment({ params, body, user }) {
     await UnitOfWork.run(user.id, (uow) => uow.appointments.cancel(params.id, body.reason));
+    const slot = await slotOf(params.id);
+    if (slot) await dropSlots(slot.doctorId, slot.startsAt);
     return ok;
   },
 
@@ -164,5 +193,5 @@ export const handlers: Handlers = {
     await UnitOfWork.run(user.id, (uow) => uow.audit.restore(params.table, params.id));
     return ok;
   },
-  ...lab2Pending, // placeholders until the real Lab 2 handlers land
+  ...lab2Handlers,
 };
