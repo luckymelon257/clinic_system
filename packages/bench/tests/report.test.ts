@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadResults, saveResults } from '../src/bench';
+import { loadResults, mergeResults, saveResults } from '../src/bench';
 import { aggregate, renderReport } from '../src/report';
 import { DEFAULT_MEASURE, type BenchResults, type RunStats } from '../src/types';
 
@@ -52,5 +52,16 @@ describe('report', () => {
     saveResults(file, results);
     const back = loadResults(file);
     expect(back.scenarios[0]!.variants[0]!.runs[7]!.p99).toBe(Infinity);
+  });
+
+  it('merges step files of a resumable run per scenario and refuses different params', () => {
+    const s1 = results.scenarios[0]!;
+    const a = { ...results, startedAt: '2026-01-01T00:00:00Z', scenarios: [{ ...s1, variants: [s1.variants[0]!], tables: [] }] };
+    const b = { ...results, startedAt: '2026-01-02T00:00:00Z', finishedAt: '2026-01-02T01:00:00Z', scenarios: [{ ...s1, variants: [{ ...s1.variants[0]!, id: 'd2' }], tables: [] }] };
+    const m = mergeResults([a, b]);
+    expect(m.scenarios).toHaveLength(1);
+    expect(m.scenarios[0]!.variants.map((v) => v.id)).toEqual(['d1', 'd2']);
+    expect([m.startedAt, m.finishedAt]).toEqual(['2026-01-01T00:00:00Z', '2026-01-02T01:00:00Z']);
+    expect(() => mergeResults([a, { ...b, paramsSha256: 'other' }])).toThrow(/params hash/);
   });
 });

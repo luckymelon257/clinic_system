@@ -20,6 +20,7 @@ const { values } = parseArgs({
     concurrency: { type: 'string' },
     reps: { type: 'string' },
     out: { type: 'string' },
+    variant: { type: 'string' }, // comma-separated variant ids, e.g. d1,d2
   },
 });
 
@@ -45,7 +46,7 @@ if (selected.length === 0) {
 const params = loadParams(values.params ?? null);
 const engines = new Engines(engineConfigFromEnv(measure.timeoutMs, Math.max(...measure.concurrency) + 8));
 try {
-  const results = await runBench(selected, { scale: values.scale!, params, measure, engines });
+  const results = await runBench(selected, { scale: values.scale!, params, measure, engines, variants: values.variant?.split(',') });
   const out = values.out ?? `results/${results.runId}-${values.scale}${values.quick ? '-quick' : ''}.json`;
   saveResults(out, results);
   console.log(`results → ${out}`);
